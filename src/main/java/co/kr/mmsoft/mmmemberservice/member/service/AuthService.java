@@ -1,9 +1,6 @@
 package co.kr.mmsoft.mmmemberservice.member.service;
 
-import co.kr.mmsoft.mmmemberservice.dto.AuthTokens;
-import co.kr.mmsoft.mmmemberservice.dto.LoginRequest;
-import co.kr.mmsoft.mmmemberservice.dto.RefreshTokenRecord;
-import co.kr.mmsoft.mmmemberservice.dto.RegistRequest;
+import co.kr.mmsoft.mmmemberservice.dto.*;
 import co.kr.mmsoft.mmmemberservice.jwt.JwtTokenProvider;
 import co.kr.mmsoft.mmmemberservice.member.principal.CustomUserDetails;
 import co.kr.mmsoft.mmmemberservice.mybatis.domain.Account;
@@ -51,6 +48,8 @@ public class AuthService {
                 .password(passwordEncoder.encode(registRequest.getPassword()))
                 .name(registRequest.getName())
                 .email(registRequest.getEmail())
+                .phone(registRequest.getPhone())
+                .company(registRequest.getCompany())
                 .provider(provider)
                 .build();
 
@@ -99,5 +98,12 @@ public class AuthService {
         //AT: 응댭 Body(JSON)
         //RT: Cookie(HttpOnly)
         return new AuthTokens(accessToken, refreshToken);
+    }
+    /*----------------------------------------
+        회원 가입 시 아이디 체크
+     ----------------------------------------*/
+    public int idCheck(String openId){
+        int cnt = accountMapper.checkByOpenId(openId);
+        return cnt;
     }
 }

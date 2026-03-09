@@ -9,4 +9,5 @@ import org.apache.ibatis.annotations.Mapper;
 public interface AccountMapper {
     int insert(Account account);
     Account findByOpenId(String openId);
+    int checkByOpenId(String openId);
 }

@@ -1,9 +1,6 @@
 package co.kr.mmsoft.mmmemberservice.controller;
 
-import co.kr.mmsoft.mmmemberservice.dto.AuthTokens;
-import co.kr.mmsoft.mmmemberservice.dto.LoginRequest;
-import co.kr.mmsoft.mmmemberservice.dto.LoginResponse;
-import co.kr.mmsoft.mmmemberservice.dto.RegistRequest;
+import co.kr.mmsoft.mmmemberservice.dto.*;
 import co.kr.mmsoft.mmmemberservice.member.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,5 +67,11 @@ public class AuthController {
         return  ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(loginResponse)
                 ;
+    }
+    @PostMapping("/idcheck")
+    public ResponseEntity<?> idcheck(@RequestBody IdcheckRequest idcheckRequest){
+        log.debug("체크할 openid = {}", idcheckRequest.getOpenId());
+        int result = authService.idCheck(idcheckRequest.getOpenId());
+        return ResponseEntity.ok(new IdcheckResponse(result));
     }
 }
