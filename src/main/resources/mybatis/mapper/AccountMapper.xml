@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountMapper">
+<!--    <select id="selectBlog" resultType="Blog">-->
+<!--        select * from Blog where id = #{id}-->
+<!--    </select>-->
+    <insert id = "insert" parameterType="Account" useGeneratedKeys="true" keyProperty="accountId">
+        insert into account(open_id, password, name, email, provider_id)
+        values(#{openId},#{password},#{name},#{email},#{provider.providerId})
+
+<!--        아래의 코드가 FM적인 코드.. but 줄여쓰는 방식도 가능-->
+<!--        <selectKey keyColumn="account_id" keyProperty="account_id" order="AFTER" resultType="int">-->
+<!--            select last_insert_id() as account_id-->
+<!--        </selectKey>-->
+    </insert>
+
+    <!-- 비밀번호 없이 아이디 만으로 회원정보 가져오기
+        주의) Account 정보를 가져올때 Provider 및 이 계정이 보유한  Role들도 함께 가져와야 하는데
+            Mybatis가 자동으로 매핑을 해주지 않으므로 개발자가 resultmap으로 직접 수행해야 한다.
+    -->
+    <resultMap id="AccountMap" type="Account">
+        <id column="account_id" property="accountId"/>
+        <result column="open_id" property="openId"/>
+        <result column="password" property="password"/>
+        <result column="name" property="name"/>
+        <result column="email" property="email"/>
+        <result column="phone" property="phone"/>
+        <result column="company" property="company"/>
+        <!-- 부모인 Provider 정보 assocation으로 가져오기 -->
+        <association column="provider_id" property="provider" javaType="Provider"
+            select="co.kr.mmsoft.mmmemberservice.mybatis.mapper.ProviderMapper.findByProviderId"/>
+        <!-- 자식인 Role 들을 Collection으로 -->
+        <collection column="account_id" property="roleList"
+                    javaType="java.util.List"
+                    ofType="Role"
+                    select = "co.kr.mmsoft.mmmemberservice.mybatis.mapper.RoleMapper.findByAccountId"
+        />
+    </resultMap>
+    <select id="findByOpenId" parameterType="String" resultMap="AccountMap">
+        select account_id, open_id, password, name, email, phone, company, provider_id
+        from account
+        where open_id=#{openId}
+    </select>
+</mapper>

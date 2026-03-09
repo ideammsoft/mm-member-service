@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="co.kr.mmsoft.mmmemberservice.mybatis.mapper.PermissionMapper">
+    <!--role_id가 매핑테이블에 레코드 중 로그인한 account가 보유한 role_id인것"-->
+    <select id="findByRoleId" resultType="Permission" parameterType="int">
+        select permission_id, permission_name from permission where permission_id in
+        (select permission_id from role_permission where role_id=#{role_id})
+    </select>
+</mapper>

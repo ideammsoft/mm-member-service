@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="co.kr.mmsoft.mmmemberservice.mybatis.mapper.RoleMapper">
+    <resultMap id="RoleMap" type="Role">
+        <id column="role_id" property="roleId"/>
+        <result column="role_name" property="roleName"/>
+        <collection column="role_id" property="permissionList" javaType="java.util.List" ofType="permission"
+                    select="co.kr.mmsoft.mmmemberservice.mybatis.mapper.PermissionMapper.findByRoleId"/>
+    </resultMap>
+    <!--role_id가 매핑테이블에 레코드 중 로그인한 account가 보유한 role_id인것"-->
+    <select id="findByAccountId" resultType="Role" parameterType="int" resultMap="RoleMap">
+        select role_id, role_name
+        from role
+        where role_id in (
+            select role_id
+            from account_role
+            where account_id=#{account_id}
+        )
+    </select>
+
+<!--    회원가입 시 특정 계정이 보유할 role을 반환-->
+    <select id="findByRoleName" parameterType="String" resultType="Role">
+        select role_id, role_name from role where role_name=#{role_name}
+    </select>
+</mapper>
