@@ -1,9 +1,6 @@
 package co.kr.mmsoft.mmmemberservice.member.service;
 
-import co.kr.mmsoft.mmmemberservice.dto.AuthTokens;
-import co.kr.mmsoft.mmmemberservice.dto.LoginRequest;
-import co.kr.mmsoft.mmmemberservice.dto.RefreshTokenRecord;
-import co.kr.mmsoft.mmmemberservice.dto.RegistRequest;
+import co.kr.mmsoft.mmmemberservice.dto.*;
 import co.kr.mmsoft.mmmemberservice.jwt.JwtTokenProvider;
 import co.kr.mmsoft.mmmemberservice.member.principal.CustomUserDetails;
 import co.kr.mmsoft.mmmemberservice.mybatis.domain.Account;
@@ -25,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 @Slf4j
@@ -51,6 +49,8 @@ public class AuthService {
                 .password(passwordEncoder.encode(registRequest.getPassword()))
                 .name(registRequest.getName())
                 .email(registRequest.getEmail())
+                .phone(registRequest.getPhone())
+                .company(registRequest.getCompany())
                 .provider(provider)
                 .build();
 
@@ -99,5 +99,65 @@ public class AuthService {
         //AT: 응댭 Body(JSON)
         //RT: Cookie(HttpOnly)
         return new AuthTokens(accessToken, refreshToken);
+    }
+    /*----------------------------------------
+        회원 가입 시 아이디 체크
+     ----------------------------------------*/
+    public int idCheck(String openId){
+        int cnt = accountMapper.checkByOpenId(openId);
+        return cnt;
+    }
+    /*----------------------------------------
+        회원 아이디 찾기
+     ----------------------------------------*/
+    public String idFind(String email, String phone) { // 리턴 타입 String
+        // 문자열 비교는 .equals() 또는 .isEmpty() 권장
+        if (email != null && !email.isEmpty()) {
+            log.debug("이메일로 찾기{}", email);
+            String returnId = accountMapper.idFindByEmail(email);
+            log.debug("이메일로 찾은 id{}", returnId);
+            return returnId; // 바로 return
+        }
+        if (phone != null && !phone.isEmpty()) {
+            return accountMapper.idFindByPhone(phone); // 바로 return
+        }
+        return null;
+    }
+    /*----------------------------------------
+        회원 패스워드 찾기
+     ----------------------------------------*/
+    public String passwordFind(IdPassFindRequest request) { // 리턴 타입 String
+        int cnt = 0;
+        String email = request.getEmail();
+        String openid = request.getOpenId();
+        String phone = request.getPhone();
+
+        // 1. 이메일 또는 전화번호로 사용자 존재 여부 확인
+        if (email != null && !email.isEmpty()) {
+            cnt = accountMapper.passwordFindByEmail(request);
+        } else if (phone != null && !phone.isEmpty()) {
+            cnt = accountMapper.passwordFindByPhone(request);
+        }
+
+        String shaPassword = ""; // 초기값
+
+        // 2. 사용자가 존재할 경우(cnt > 0)에만 랜덤 비밀번호 생성
+        if (cnt > 0) {
+            String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            shaPassword = new Random().ints(8, 0, chars.length())
+                    .mapToObj(chars::charAt)
+                    .collect(StringBuilder::new, StringBuilder::append, StringBuilder::append)
+                    .toString();
+
+            // 3. TODO: 여기서 실제로 DB의 비밀번호를 업데이트하는 쿼리가 실행되어야 합니다.
+            request.setIdOrPass(passwordEncoder.encode(shaPassword));
+            int result = accountMapper.updatePassword(request);
+            if (result == 0) shaPassword = "";
+            log.debug("변경된 password : {}", shaPassword);
+            // log.debug("임시 비밀번호 생성 완료: {}", shaPassword);
+        }
+
+        // 4. 생성된 비밀번호(또는 빈값)를 리턴하면 변수들의 밑줄이 사라집니다.
+        return shaPassword.isEmpty() ? null : shaPassword;
     }
 }

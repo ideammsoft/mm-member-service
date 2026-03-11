@@ -15,5 +15,7 @@ public class RegistRequest {
     private String password;
     private String name;
     private String email;
+    private String phone;
+    private String company;
     private Provider provider;
 }
