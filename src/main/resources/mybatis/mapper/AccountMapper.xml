@@ -7,8 +7,8 @@
 <!--        select * from Blog where id = #{id}-->
 <!--    </select>-->
     <insert id = "insert" parameterType="Account" useGeneratedKeys="true" keyProperty="accountId">
-        insert into account(open_id, password, name, email, provider_id)
-        values(#{openId},#{password},#{name},#{email},#{provider.providerId})
+        insert into account(open_id, password, name, email, phone, company, provider_id)
+        values(#{openId},#{password},#{name},#{email},#{phone},#{company},#{provider.providerId})
 
 <!--        아래의 코드가 FM적인 코드.. but 줄여쓰는 방식도 가능-->
 <!--        <selectKey keyColumn="account_id" keyProperty="account_id" order="AFTER" resultType="int">-->
@@ -44,9 +44,34 @@
         where open_id=#{openId}
     </select>
     <select id="checkByOpenId" parameterType="String" resultType="int">
-        select count(*) as cnt
-        from account
-        where open_id=#{openId}
+        select count(*) as cnt from account where open_id=#{openId}
     </select>
+    <select id="idFindByEmail" parameterType="String" resultType="String">
+        select count(*) as cnt
+        from (
+        select account_id
+        from account
+        where open_id=#{openId} and email=#{email}
+        order by account_id desc
+        limit 1
+        ) t
+    </select>
+    <select id="idFindByPhone" parameterType="String" resultType="String">
+        SELECT open_id
+        FROM account
+        WHERE phone = #{phone}
+        ORDER BY account_id DESC
+        LIMIT 1
+    </select>
+    <select id="passwordFindByEmail" parameterType="co.kr.mmsoft.mmmemberservice.dto.IdPassFindRequest" resultType="int">
+        select count(*) as cnt from account where open_id=#{openId} and email=#{email}
+
+    </select>
+    <select id="passwordFindByPhone" parameterType="co.kr.mmsoft.mmmemberservice.dto.IdPassFindRequest" resultType="int">
+        select count(*) as cnt from account where open_id=#{openId} and phone=#{phone}
+    </select>
+    <update id="updatePassword" parameterType="co.kr.mmsoft.mmmemberservice.dto.IdPassFindRequest">
+        update account set password = #{idOrPass} where open_id=#{openId}
+    </update>
 
 </mapper>

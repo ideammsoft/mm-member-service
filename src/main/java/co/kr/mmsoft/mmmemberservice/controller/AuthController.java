@@ -69,9 +69,31 @@ public class AuthController {
                 ;
     }
     @PostMapping("/idcheck")
-    public ResponseEntity<?> idcheck(@RequestBody IdcheckRequest idcheckRequest){
+    public ResponseEntity<?> idcheck(@RequestBody IdCheckRequest idcheckRequest){
         log.debug("체크할 openid = {}", idcheckRequest.getOpenId());
         int result = authService.idCheck(idcheckRequest.getOpenId());
-        return ResponseEntity.ok(new IdcheckResponse(result));
+        return ResponseEntity.ok(new IdCheckResponse(result));
     }
+    @PostMapping("/idpassfind")
+// 파라미터 이름을 request로 통일하고 타입을 IdPassFindRequest로 변경하세요.
+    public ResponseEntity<?> idpassfind(@RequestBody IdPassFindRequest request) {
+        log.debug("입력한 아이디는? {}", request.getOpenId());
+        log.debug("입력한 이메일은? {}", request.getEmail());
+        log.debug("입력한 전화번호? {}", request.getPhone());
+
+        String idOrPass = request.getIdOrPass(); // ( ) 괄호 추가 및 인스턴스(request) 호출
+
+        if ("id".equals(idOrPass)) { // 문자열 비교는 .equals() 사용
+            // 서비스의 idFind를 호출하고 결과를 String으로 받음
+            String foundId = authService.idFind(request.getEmail(), request.getPhone());
+            return ResponseEntity.ok(Map.of("foundId", foundId != null ? foundId : "없음"));
+        } else {
+            String newPassword = authService.passwordFind(request);
+            log.debug("변경결과? {}", newPassword);
+            return ResponseEntity.ok(Map.of(
+                    "newPassword", (newPassword != null && !newPassword.isEmpty()) ? "ok" : "")
+            );
+        }
+    }
+
 }

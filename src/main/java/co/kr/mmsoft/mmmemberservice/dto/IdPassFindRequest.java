@@ -6,7 +6,10 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class IdcheckRequest {
+public class IdPassFindRequest {
     @JsonProperty("homepageId") //파라미터명이 틀릴 경우 어노테이션으로 조절할 수 잇다.
     private String openId;
+    private String idOrPass;
+    private String email;
+    private String phone;
 }

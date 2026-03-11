@@ -1,5 +1,6 @@
 package co.kr.mmsoft.mmmemberservice.mybatis.mapper;
 
+import co.kr.mmsoft.mmmemberservice.dto.IdPassFindRequest;
 import co.kr.mmsoft.mmmemberservice.mybatis.domain.Account;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -10,4 +11,9 @@ public interface AccountMapper {
     int insert(Account account);
     Account findByOpenId(String openId);
     int checkByOpenId(String openId);
+    String idFindByEmail(String email);
+    String idFindByPhone(String email);
+    int passwordFindByEmail(IdPassFindRequest request); // 파라미터가 DTO 객체인지 확인
+    int passwordFindByPhone(IdPassFindRequest request);
+    int updatePassword(IdPassFindRequest request);
 }
