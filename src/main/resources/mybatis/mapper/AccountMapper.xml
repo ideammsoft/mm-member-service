@@ -74,4 +74,32 @@
         update account set password = #{idOrPass} where open_id=#{openId}
     </update>
 
+    <!-- OAuth2 소셜 로그인 전용 - 공급자 이름 + openId로 회원 조회 -->
+    <select id="findByProviderAndOpenId" resultMap="AccountMap">
+        SELECT a.account_id, a.open_id, a.password, a.name, a.email, a.phone, a.company, a.provider_id
+        FROM account a
+        JOIN provider p ON a.provider_id = p.provider_id
+        WHERE p.provider_name = #{providerName}
+          AND a.open_id = #{openId}
+    </select>
+
+    <!-- accountId(PK)로 회원 조회 - JWT 필터 및 회원정보 조회에 사용 -->
+    <select id="findByAccountId" parameterType="Long" resultMap="AccountMap">
+        SELECT account_id, open_id, password, name, email, phone, company, provider_id
+        FROM account
+        WHERE account_id = #{accountId}
+    </select>
+
+    <!-- 회원 정보 수정 -->
+    <update id="updateProfile" parameterType="co.kr.mmsoft.mmmemberservice.dto.MemberProfileUpdateRequest">
+        UPDATE account
+        SET name = #{name}, email = #{email}, phone = #{phone}, company = #{company}
+        WHERE account_id = #{accountId}
+    </update>
+
+    <!-- 회원 탈퇴 -->
+    <delete id="deleteByAccountId" parameterType="Long">
+        DELETE FROM account WHERE account_id = #{accountId}
+    </delete>
+
 </mapper>
