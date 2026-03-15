@@ -6,6 +6,7 @@ import co.kr.mmsoft.mmmemberservice.member.service.AuthService;
 import co.kr.mmsoft.mmmemberservice.mybatis.domain.Account;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountMapper;
 import co.kr.mmsoft.mmmemberservice.redis.RedisRefreshTokenStore;
+import co.kr.mmsoft.mmmemberservice.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -58,6 +59,7 @@ public class AuthController {
     private final RedisRefreshTokenStore  redisRefreshTokenStore;
     private final JwtTokenProvider        jwtTokenProvider;
     private final AccountMapper           accountMapper;
+    private final EmailService            emailService;
 
     /*─────────────────────────────────────────────────────
      * [1] 회원가입 API
@@ -157,10 +159,34 @@ public class AuthController {
             // 비밀번호 찾기 (임시 비밀번호 발급)
             String newPassword = authService.passwordFind(request);
             log.debug("임시 비밀번호 발급 결과: {}", newPassword);
+
+            if (newPassword != null && !newPassword.isEmpty()) {
+                // 이메일로 임시 비밀번호 발송
+                String targetEmail = null;
+
+                if (request.getEmail() != null && !request.getEmail().isBlank()) {
+                    // 이메일로 찾기: 입력한 이메일로 발송
+                    targetEmail = request.getEmail();
+                } else if (request.getOpenId() != null && !request.getOpenId().isBlank()) {
+                    // 휴대폰으로 찾기: openId로 계정 조회 후 이메일 발송
+                    Account account = accountMapper.findByOpenId(request.getOpenId());
+                    if (account != null && account.getEmail() != null) {
+                        targetEmail = account.getEmail();
+                    }
+                }
+
+                if (targetEmail != null) {
+                    try {
+                        emailService.sendTempPassword(targetEmail, newPassword);
+                    } catch (Exception e) {
+                        log.error("이메일 발송 실패: {}", e.getMessage());
+                        // 이메일 발송 실패해도 비밀번호는 변경되었으므로 ok 반환
+                    }
+                }
+            }
+
             return ResponseEntity.ok(
                     Map.of("newPassword", (newPassword != null && !newPassword.isEmpty()) ? "ok" : "")
-                    // 보안상 실제 임시 비밀번호를 응답에 담지 않고 "ok"만 반환
-                    // 실제 서비스에서는 이메일이나 SMS로 임시 비밀번호를 전달해야 합니다
             );
         }
     }
