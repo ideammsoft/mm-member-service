@@ -7,8 +7,12 @@ import lombok.Setter;
 @Setter
 public class LoginResponse {
     private String accessToken;
+    private String name;
+    private String roleName;
 
-    public LoginResponse(String accessToken) {
+    public LoginResponse(String accessToken, String name, String roleName) {
         this.accessToken = accessToken;
+        this.name = name;
+        this.roleName = roleName;
     }
 }
