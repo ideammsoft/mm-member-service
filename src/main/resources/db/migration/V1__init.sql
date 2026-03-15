@@ -15,6 +15,7 @@ create table account(
     , name varchar(25)
     , email varchar(25)
     , phone varchar(25)
+    , mphone varchar(25)
     , company varchar(50)
     , provider_id int
     , constraint fk_provider_account foreign key (provider_id) references provider(provider_id)
@@ -75,10 +76,10 @@ CREATE TABLE workboard (
        name             VARCHAR(20) DEFAULT NULL,
        reg_date         DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '작성일',
        update_date      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
-       passwd           VARCHAR(20) DEFAULT NULL COMMENT '삭제 패스워드', -- 쉼표 오류 수정
+       passwd           VARCHAR(20) DEFAULT NULL COMMENT '열람 패스워드', -- 쉼표 오류 수정
        url              VARCHAR(100) DEFAULT NULL,
        workboard_rolename VARCHAR(50)                    COMMENT '작업실게시판 종류',
        is_deleted       CHAR(1) DEFAULT 'N'            COMMENT '삭제 여부 (Y/N)',
        CONSTRAINT FK_workboard_account FOREIGN KEY (account_id) -- 제약 조건 이름 중복 수정
            REFERENCES account (account_id) ON DELETE CASCADE
-); -- 세미콜론 추가
+);

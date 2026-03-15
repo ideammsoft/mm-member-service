@@ -67,10 +67,14 @@ dependencies {
     //선택) Redis 성능 모니터링이나 컨넥션풀 관리
     implementation 'org.apache.commons:commons-pool2'
 
+    // OAuth2 소셜 로그인 (Google, Naver, Kakao)
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
+    implementation 'org.springframework.cloud:spring-cloud-starter-bootstrap'
 }
 
 dependencyManagement {

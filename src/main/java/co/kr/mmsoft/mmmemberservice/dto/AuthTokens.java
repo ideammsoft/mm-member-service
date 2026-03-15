@@ -10,9 +10,13 @@ import lombok.Setter;
 public class AuthTokens {
     private String accessToken;
     private String refreshToken;
+    private String name;
+    private String roleName;
 
-    public AuthTokens(String accessToken, String refreshToken) {
+    public AuthTokens(String accessToken, String refreshToken, String name, String roleName) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
+        this.name = name;
+        this.roleName = roleName;
     }
 }
