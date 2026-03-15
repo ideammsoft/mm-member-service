@@ -10,6 +10,7 @@ public class MemberProfileUpdateRequest {
     private Long   accountId; // 서버에서 JWT로 세팅 (클라이언트 미입력)
     private String name;
     private String email;
+    private String mphone;
     private String phone;
     private String company;
 }

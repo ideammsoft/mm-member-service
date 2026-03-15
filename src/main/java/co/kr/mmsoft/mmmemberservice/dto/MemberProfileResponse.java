@@ -10,6 +10,7 @@ public class MemberProfileResponse {
     private final String openId;
     private final String name;
     private final String email;
+    private final String mphone;
     private final String phone;
     private final String company;
     private final String provider;
@@ -19,6 +20,7 @@ public class MemberProfileResponse {
         this.openId    = account.getOpenId();
         this.name      = account.getName();
         this.email     = account.getEmail();
+        this.mphone    = account.getMphone();
         this.phone     = account.getPhone();
         this.company   = account.getCompany();
         this.provider  = account.getProvider() != null

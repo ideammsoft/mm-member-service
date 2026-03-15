@@ -69,7 +69,10 @@ public class Account {
     // 이메일 주소
     private String email;
 
-    // 전화번호
+    // 휴대폰 번호
+    private String mphone;
+
+    // 회사 전화
     private String phone;
 
     // 회사명 (선택 입력)
@@ -99,12 +102,13 @@ public class Account {
      */
     @Builder
     public Account(Long accountId, String openId, String password, String name,
-                   String email, String phone, String company, Provider provider) {
+                   String email, String mphone, String phone, String company, Provider provider) {
         this.accountId = accountId;
         this.openId    = openId;
         this.password  = password;
         this.name      = name;
         this.email     = email;
+        this.mphone    = mphone;
         this.phone     = phone;
         this.company   = company;
         this.provider  = provider;

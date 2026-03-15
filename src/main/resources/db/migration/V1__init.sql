@@ -15,6 +15,7 @@ create table account(
     , name varchar(25)
     , email varchar(25)
     , phone varchar(25)
+    , mphone varchar(25)
     , company varchar(50)
     , provider_id int
     , constraint fk_provider_account foreign key (provider_id) references provider(provider_id)

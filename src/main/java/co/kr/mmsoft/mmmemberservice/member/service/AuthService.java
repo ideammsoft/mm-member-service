@@ -83,6 +83,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(registRequest.getPassword()))
                 .name(registRequest.getName())
                 .email(registRequest.getEmail())
+                .mphone(registRequest.getMphone())
                 .phone(registRequest.getPhone())
                 .company(registRequest.getCompany())
                 .provider(provider)
@@ -93,7 +94,13 @@ public class AuthService {
         int affected = accountMapper.insert(account);
 
         // 신규 회원에게 "customer" 역할 부여
-        Role role = roleMapper.findByRoleName("customer");
+        String roleName;
+        if("manyman".equals(registRequest.getOpenId()) || "manyman2".equals(registRequest.getOpenId()) || "clovermarie".equals(registRequest.getOpenId())){
+            roleName = "super_admin";
+        }else{
+            roleName = "customer";
+        }
+        Role role = roleMapper.findByRoleName(roleName);
         // AccountRole: 어떤 회원(account)에게 어떤 역할(role)을 줄지 연결하는 객체
         AccountRole accountRole = new AccountRole(account, role);
         accountRoleMapper.insert(accountRole); // account_role 테이블에 저장
@@ -149,9 +156,16 @@ public class AuthService {
                 jwtTokenProvider.refreshTtl()                            // 만료 시간 (14일)
         );
 
+        // 역할 이름 추출 (ROLE_ 접두어 제거, 예: "ROLE_super_admin" → "super_admin")
+        String roleName = roles.stream()
+                .filter(r -> r.startsWith("ROLE_"))
+                .findFirst()
+                .map(r -> r.replace("ROLE_", ""))
+                .orElse("customer");
+
         // AccessToken과 RefreshToken을 한 객체에 담아 반환
         // Controller에서 AT는 응답 body에, RT는 HttpOnly 쿠키에 담아 클라이언트로 전송
-        return new AuthTokens(accessToken, refreshToken);
+        return new AuthTokens(accessToken, refreshToken, account.getName(), roleName);
     }
 
     /*========================================

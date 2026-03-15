@@ -98,7 +98,7 @@ public class AuthController {
 
         // AccessToken은 응답 body에 담아서 전달
         // (프론트에서 메모리/localStorage에 보관 후 API 호출 시 Authorization 헤더에 첨부)
-        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken());
+        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken(), authTokens.getName(), authTokens.getRoleName());
 
         // RefreshToken은 HttpOnly 쿠키로 전달
         // HttpOnly: JavaScript에서 접근 불가 → XSS 공격으로부터 보호
@@ -196,7 +196,7 @@ public class AuthController {
 
         log.debug("OAuth2 임시코드 교환 성공");
         // 성공: AccessToken을 body에 담아 응답
-        return ResponseEntity.ok(new LoginResponse(accessToken));
+        return ResponseEntity.ok(new LoginResponse(accessToken, null, null));
     }
 
     /*─────────────────────────────────────────────────────
@@ -228,12 +228,13 @@ public class AuthController {
                           ? account.getProvider().getProviderName() : "local";
 
         log.debug("OAuth2 exchange 성공 - accountId: {}, isNewMember: {}",
-                  accountId, (account.getPhone() == null || account.getPhone().isBlank()));
+                  accountId, (account.getMphone() == null || account.getMphone().isBlank()));
 
         return ResponseEntity.ok(new OAuthExchangeResponse(
                 accessToken,
                 account.getName(),
                 account.getEmail(),
+                account.getMphone(),
                 account.getPhone(),
                 account.getCompany(),
                 provider
