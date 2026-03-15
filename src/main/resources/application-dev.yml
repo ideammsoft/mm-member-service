@@ -19,6 +19,7 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: false   # 개발환경: 마이그레이션 파일 수정 후 체크섬 불일치 무시
 
+
   # OAuth2 소셜 로그인 설정
   security:
     oauth2:
