@@ -96,11 +96,18 @@ public class AuthController {
         log.debug("로그인 요청 homepageId: {}", loginRequest.getHomepageId());
 
         // 서비스에서 Spring Security 인증 + JWT 발급 처리
-        AuthTokens authTokens = authService.login(loginRequest);
+        AuthTokens authTokens;
+        try {
+            authTokens = authService.login(loginRequest);
+        } catch (Exception e) {
+            log.debug("로그인 실패: {}", e.getMessage());
+            return ResponseEntity.status(401)
+                    .body(Map.of("message", "아이디 또는 비밀번호가 올바르지 않습니다."));
+        }
 
         // AccessToken은 응답 body에 담아서 전달
         // (프론트에서 메모리/localStorage에 보관 후 API 호출 시 Authorization 헤더에 첨부)
-        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken(), authTokens.getName(), authTokens.getRoleName());
+        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken(), authTokens.getName(), authTokens.getRoleName(), authTokens.getAccountId());
 
         // RefreshToken은 HttpOnly 쿠키로 전달
         // HttpOnly: JavaScript에서 접근 불가 → XSS 공격으로부터 보호
@@ -116,6 +123,7 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, cookie.toString()) // 쿠키를 응답 헤더에 추가
                 .body(loginResponse);                               // body에 AccessToken 담기
     }
+
 
     /*─────────────────────────────────────────────────────
      * [3] 아이디 중복 확인 API

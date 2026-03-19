@@ -10,7 +10,7 @@ import lombok.Setter;
 public class RegistRequest {
     //DTO는 파라미터를 받거나, 응답정보로 사용하는 용도이므로
     //굳이 Database 컬럼명과 일치시킬 필요가 없다(그럼 누가 일치해야 하나? Entity, Domain)
-    @JsonProperty("homepageId") //파라미터명이 틀릴 경우 어노테이션으로 조절할 수 잇다.
+    @JsonProperty("openId")
     private String openId;
     private String password;
     private String name;

@@ -7,7 +7,6 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
- * 
  * =====================================================================
  * [AccountMapper.java] - account 테이블 CRUD 매퍼 인터페이스
  * =====================================================================
@@ -122,4 +121,7 @@ public interface AccountMapper {
 
     /** 회원 탈퇴 */
     int deleteByAccountId(Long accountId);
+
+    /** 비밀번호 변경 (로그인한 회원 본인) */
+    int updatePasswordByAccountId(@Param("accountId") Long accountId, @Param("password") String password);
 }

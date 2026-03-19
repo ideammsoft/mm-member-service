@@ -1,23 +1,21 @@
-server:
-  port: 1991
-
 spring:
-  application:
-    name: mm-member-service
-
-  config:
-    import: "optional:configserver:http://localhost:1881"
-
   datasource:
     url: jdbc:mysql://localhost:3306/liveshop
     username: liveshop
     password: "1234"
+
 
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false   # 개발환경: 마이그레이션 파일 수정 후 체크섬 불일치 무시
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+
+
+
 
 
 mybatis:
@@ -29,11 +27,12 @@ mybatis:
 
 app:
   jwt:
-    secret: ${JWT_SECRET}
     access-token-minutes: 15
     refresh-token-minutes: 20160 #14일
   # 프론트엔드 URL (CORS 및 OAuth2 리다이렉트용)
   frontend-url: "http://localhost:5173"
+  # MSSQL(manymen_bank) - manyman 테이블 동기화용
+
 
 my:
   logging:
