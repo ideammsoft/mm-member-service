@@ -15,23 +15,18 @@ spring:
     password: ${spring.datasource.password}
 
 
-
-
+app:
+  jwt:
+    secret: mm-secret-key-for-jwt-token-signing-must-be-long-enough
+    access-token-minutes: 15
+    refresh-token-minutes: 20160 #14일
+  frontend-url: "http://localhost:5173"
 
 mybatis:
   type-aliases-package: co.kr.mmsoft.mmmemberservice.mybatis.domain
   mapper-locations: classpath:mybatis/mapper/*.xml
   configuration:
-    # db컬럼명 account_id ==> java 객체 accountId
     map-underscore-to-camel-case: true
-
-app:
-  jwt:
-    access-token-minutes: 15
-    refresh-token-minutes: 20160 #14일
-  # 프론트엔드 URL (CORS 및 OAuth2 리다이렉트용)
-  frontend-url: "http://localhost:5173"
-  # MSSQL(manymen_bank) - manyman 테이블 동기화용
 
 
 my:
