@@ -8,6 +8,7 @@ import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountRoleMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.ProviderMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.RoleMapper;
+import co.kr.mmsoft.mmmemberservice.service.ManymanSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.GrantedAuthority;
@@ -23,6 +24,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * =====================================================================
@@ -59,10 +61,11 @@ import java.util.Map;
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     // DB 접근용 Mapper 객체들
-    private final ProviderMapper   providerMapper;
-    private final AccountMapper    accountMapper;
-    private final RoleMapper       roleMapper;
+    private final ProviderMapper    providerMapper;
+    private final AccountMapper     accountMapper;
+    private final RoleMapper        roleMapper;
     private final AccountRoleMapper accountRoleMapper;
+    private final Optional<ManymanSyncService> manymanSyncService;
 
     /**
      * 소셜 공급자로부터 사용자 정보를 가져오고 DB에 저장/조회합니다.
@@ -126,6 +129,9 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             // 이미 가입된 회원인 경우 → 그냥 로그인 처리
             log.debug("OAuth2 기존 회원 로그인: {}", info.name());
         }
+
+        // MSSQL manyman 동기화: email로 없으면 INSERT (phone/company는 빈칸)
+        manymanSyncService.ifPresent(svc -> svc.syncOAuthOnLogin(info.email(), info.name()));
 
         // Spring Security가 사용할 권한 목록 (일단 customer 역할 부여)
         Collection<GrantedAuthority> authorities = List.of(

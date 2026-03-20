@@ -8,6 +8,7 @@ import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountRoleMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.ProviderMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.RoleMapper;
+import co.kr.mmsoft.mmmemberservice.service.ManymanSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
@@ -16,6 +17,8 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 /**
  * =====================================================================
@@ -45,10 +48,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
 
-    private final ProviderMapper   providerMapper;
-    private final AccountMapper    accountMapper;
-    private final RoleMapper       roleMapper;
+    private final ProviderMapper    providerMapper;
+    private final AccountMapper     accountMapper;
+    private final RoleMapper        roleMapper;
     private final AccountRoleMapper accountRoleMapper;
+    private final Optional<ManymanSyncService> manymanSyncService;
 
     // OidcUserService: Spring이 제공하는 OIDC 기본 처리 객체 (Google 사용자 정보 조회)
     // final: 한번 생성되면 변경 불가 (불변)
@@ -107,6 +111,10 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
         } else {
             log.debug("Google 기존 회원 로그인: {}", name);
         }
+
+        // MSSQL manyman 동기화: email로 없으면 INSERT (phone/company는 빈칸)
+        log.debug("manyman 동기화 시도 - syncService 존재: {}, email: {}", manymanSyncService.isPresent(), email);
+        manymanSyncService.ifPresent(svc -> svc.syncOAuthOnLogin(email, name));
 
         // Spring Security에 OidcUser 그대로 반환
         // OAuth2LoginSuccessHandler에서 oidcUser.getSubject()로 openId를 추출합니다

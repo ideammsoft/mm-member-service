@@ -12,8 +12,10 @@ import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountRoleMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.ProviderMapper;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.RoleMapper;
 import co.kr.mmsoft.mmmemberservice.redis.RedisRefreshTokenStore;
+import co.kr.mmsoft.mmmemberservice.service.ManymanSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -22,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
@@ -65,6 +68,10 @@ public class AuthService {
     // Redis에 RefreshToken 저장 담당
     private final RedisRefreshTokenStore redisRefreshTokenStore;
 
+    // MSSQL manyman 동기화 (설정 없으면 Optional.empty)
+    @Autowired(required = false)
+    private ManymanSyncService manymanSyncService;
+
     /*========================================
      * 1. 회원 가입
      * 홈페이지 직접 가입 (provider = "homepage")
@@ -104,6 +111,11 @@ public class AuthService {
         // AccountRole: 어떤 회원(account)에게 어떤 역할(role)을 줄지 연결하는 객체
         AccountRole accountRole = new AccountRole(account, role);
         accountRoleMapper.insert(accountRole); // account_role 테이블에 저장
+
+        // MSSQL manyman 테이블 동기화 (homepage 가입만)
+        if (manymanSyncService != null) {
+            manymanSyncService.syncOnRegist(registRequest, registRequest.getPassword());
+        }
 
         log.debug("회원가입 결과: {}", affected);
     }
@@ -165,7 +177,7 @@ public class AuthService {
 
         // AccessToken과 RefreshToken을 한 객체에 담아 반환
         // Controller에서 AT는 응답 body에, RT는 HttpOnly 쿠키에 담아 클라이언트로 전송
-        return new AuthTokens(accessToken, refreshToken, account.getName(), roleName);
+        return new AuthTokens(accessToken, refreshToken, account.getName(), roleName, account.getAccountId());
     }
 
     /*========================================
