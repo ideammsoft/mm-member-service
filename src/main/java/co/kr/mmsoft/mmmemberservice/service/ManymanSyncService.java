@@ -12,6 +12,8 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * MSSQL manymen_bank.dbo.manyman 테이블 동기화 서비스
@@ -204,6 +206,43 @@ public class ManymanSyncService {
         } catch (Exception e) {
             log.warn("manyman 동기화 실패(OAuth 로그인) - email: {}, 오류: {}", email, e.getMessage());
         }
+    }
+
+    /**
+     * 아이디 + 휴대폰번호로 manyman 조회 (비밀번호 찾기 fallback용)
+     * 전화번호 하이픈/공백 자동 정규화
+     *
+     * @return 사용자 정보 Map(name, email, mphone, phone, company) 또는 null
+     */
+    public Map<String, String> findByOpenIdAndPhone(String openId, String phone) {
+        if (openId == null || phone == null) return null;
+        String normalized = phone.replaceAll("[^0-9]", "");
+        String sql = """
+                SELECT TOP 1 name, email, mphone, phone, company
+                FROM manyman
+                WHERE id = ?
+                  AND REPLACE(REPLACE(mphone, '-', ''), ' ', '') = ?
+                  AND isDelete = 0
+                """;
+        try (Connection conn = mssqlDataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, openId);
+            ps.setString(2, normalized);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Map<String, String> result = new HashMap<>();
+                    result.put("name",    rs.getString("name"));
+                    result.put("email",   rs.getString("email"));
+                    result.put("mphone",  rs.getString("mphone"));
+                    result.put("phone",   rs.getString("phone"));
+                    result.put("company", rs.getString("company"));
+                    return result;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("manyman 조회 실패 - openId: {}, 오류: {}", openId, e.getMessage());
+        }
+        return null;
     }
 
     /** INSERT (OAuth 로그인 - password 빈칸) */

@@ -183,6 +183,12 @@ public class SecurityConfig {
                 // /error : 스프링 에러 페이지 → 허용
                 .requestMatchers("/error").permitAll()
 
+                // /api/pds/** : 제품소개 공개 API → 누구나 접근 가능
+                .requestMatchers("/api/pds/**").permitAll()
+
+                // /images/pds/** : 제품소개 썸네일 이미지 → 누구나 접근 가능
+                .requestMatchers("/images/pds/**").permitAll()
+
                 // 그 외 모든 경로 → 로그인(인증) 필요
                 .anyRequest().authenticated()
         );

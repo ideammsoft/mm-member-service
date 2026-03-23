@@ -102,7 +102,7 @@ public class AuthService {
 
         // 신규 회원에게 "customer" 역할 부여
         String roleName;
-        if("manyman".equals(registRequest.getOpenId()) || "manyman2".equals(registRequest.getOpenId()) || "clovermarie".equals(registRequest.getOpenId())){
+        if("manyman".equals(registRequest.getOpenId()) || "manyman2".equals(registRequest.getOpenId()) || "clovermarie".equals(registRequest.getOpenId()) || "monde".equals(registRequest.getOpenId())){
             roleName = "super_admin";
         }else{
             roleName = "customer";
@@ -218,42 +218,70 @@ public class AuthService {
      * 아이디 + 이메일 또는 아이디 + 전화번호로 본인 확인 후 임시 비밀번호 발급
      * ========================================*/
     public String passwordFind(IdPassFindRequest request) {
-        int cnt = 0; // 해당 회원이 존재하는지 카운트
-
         String email  = request.getEmail();
         String openId = request.getOpenId();
         String phone  = request.getPhone();
+        boolean foundInAccount = false;
 
-        // 본인 확인: 아이디 + 이메일 또는 아이디 + 전화번호 일치 여부 확인
+        // 본인 확인: 아이디 + 이메일 또는 아이디 + 전화번호 일치 여부
         if (email != null && !email.isEmpty()) {
-            cnt = accountMapper.passwordFindByEmail(request); // 이메일로 본인 확인
+            foundInAccount = accountMapper.passwordFindByEmail(request) > 0;
         } else if (phone != null && !phone.isEmpty()) {
-            cnt = accountMapper.passwordFindByPhone(request); // 전화번호로 본인 확인
+            foundInAccount = accountMapper.passwordFindByPhone(request) > 0;
         }
 
-        // 본인 확인이 안 된 경우 (입력한 아이디와 이메일/전화번호 조합이 DB에 없음)
-        if (cnt <= 0) {
-            return null; // 찾지 못함 반환
+        // MySQL account에 없으면 MSSQL manyman 테이블로 fallback (휴대폰 방식만)
+        if (!foundInAccount && phone != null && !phone.isEmpty() && manymanSyncService != null) {
+            java.util.Map<String, String> manymanUser = manymanSyncService.findByOpenIdAndPhone(openId, phone);
+            if (manymanUser != null) {
+                log.info("manyman fallback 성공 - openId: {}, account 자동 생성", openId);
+                // account 테이블에 없으면 생성 (비밀번호 찾기 후 로그인 가능하도록)
+                if (accountMapper.checkByOpenId(openId) == 0) {
+                    createAccountFromManyman(openId, manymanUser);
+                }
+                foundInAccount = true;
+            }
         }
 
-        // 임시 비밀번호 생성 (영문 대소문자 + 숫자 8자리 랜덤 조합)
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        String tempPassword = new Random().ints(8, 0, chars.length()) // 8개의 랜덤 인덱스 생성
-                .mapToObj(chars::charAt)                               // 인덱스 → 문자 변환
-                .collect(StringBuilder::new, StringBuilder::append, StringBuilder::append) // 이어붙이기
-                .toString(); // 최종 문자열 (예: "aB3kP9xZ")
+        if (!foundInAccount) {
+            return null;
+        }
 
-        // 임시 비밀번호를 암호화하여 DB에 저장
+        // 임시 비밀번호 생성 (영문 대소문자 + 숫자 8자리)
+        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        String tempPassword = new Random().ints(8, 0, chars.length())
+                .mapToObj(chars::charAt)
+                .collect(StringBuilder::new, StringBuilder::append, StringBuilder::append)
+                .toString();
+
+        // 임시 비밀번호 BCrypt 암호화 후 account 업데이트
         request.setIdOrPass(passwordEncoder.encode(tempPassword));
         int result = accountMapper.updatePassword(request);
 
         if (result == 0) {
-            return null; // 업데이트 실패
+            return null;
         }
 
-        log.debug("임시 비밀번호 발급 완료: {}", tempPassword);
-        // 평문 임시 비밀번호를 반환 (사용자에게 보여줄 용도)
-        // DB에는 이미 암호화된 버전이 저장되었습니다
+        log.debug("임시 비밀번호 발급 완료: openId={}", openId);
         return tempPassword;
+    }
+
+    /** manyman 사용자를 MySQL account 테이블에 자동 생성 (homepage provider, customer role) */
+    private void createAccountFromManyman(String openId, java.util.Map<String, String> info) {
+        try {
+            RegistRequest reg = new RegistRequest();
+            reg.setOpenId(openId);
+            reg.setPassword("DISABLED_" + java.util.UUID.randomUUID()); // 비밀번호 찾기 필수
+            reg.setName(info.getOrDefault("name", ""));
+            reg.setEmail(info.getOrDefault("email", ""));
+            reg.setMphone(info.getOrDefault("mphone", ""));
+            reg.setPhone(info.getOrDefault("phone", ""));
+            reg.setCompany(info.getOrDefault("company", ""));
+            // regist()는 manyman 동기화까지 수행하지만 provider/role 처리를 포함하므로 재사용
+            regist(reg);
+            log.info("manyman 사용자 account 자동 생성 완료 - openId: {}", openId);
+        } catch (Exception e) {
+            log.warn("account 자동 생성 실패 - openId: {}, 오류: {}", openId, e.getMessage());
+        }
     }
 }

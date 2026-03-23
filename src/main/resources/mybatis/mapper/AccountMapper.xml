@@ -69,7 +69,9 @@
 
     </select>
     <select id="passwordFindByPhone" parameterType="co.kr.mmsoft.mmmemberservice.dto.IdPassFindRequest" resultType="int">
-        select count(*) as cnt from account where open_id=#{openId} and mphone=#{phone}
+        select count(*) as cnt from account
+        where open_id=#{openId}
+          and replace(replace(mphone, '-', ''), ' ', '') = replace(replace(#{phone}, '-', ''), ' ', '')
     </select>
     <update id="updatePassword" parameterType="co.kr.mmsoft.mmmemberservice.dto.IdPassFindRequest">
         update account set password = #{idOrPass} where open_id=#{openId}

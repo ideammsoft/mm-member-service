@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="co.kr.mmsoft.mmmemberservice.mybatis.mapper.PdsMapper">
+
+    <select id="findAll" resultType="Pds">
+        SELECT pds_id, title, content, os_info, version, file_size, download_count,
+               thumbnail, download_url, category, sort_order, published_at, is_active, reg_date, update_date
+        FROM pds
+        WHERE is_active = 'Y'
+        <if test="category != null and category != '' and category != 'all'">
+            AND category = #{category}
+        </if>
+        ORDER BY sort_order ASC, pds_id ASC
+    </select>
+
+    <select id="findById" resultType="Pds">
+        SELECT pds_id, title, content, os_info, version, file_size, download_count,
+               thumbnail, download_url, category, sort_order, published_at, is_active, reg_date, update_date
+        FROM pds
+        WHERE pds_id = #{pdsId} AND is_active = 'Y'
+    </select>
+
+    <update id="incrementDownloadCount">
+        UPDATE pds SET download_count = download_count + 1 WHERE pds_id = #{pdsId}
+    </update>
+
+</mapper>
