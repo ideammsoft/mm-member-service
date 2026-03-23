@@ -7,8 +7,10 @@ import co.kr.mmsoft.mmmemberservice.mybatis.domain.Account;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountMapper;
 import co.kr.mmsoft.mmmemberservice.redis.RedisRefreshTokenStore;
 import co.kr.mmsoft.mmmemberservice.service.EmailService;
+import co.kr.mmsoft.mmmemberservice.service.SmsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
@@ -60,6 +62,10 @@ public class AuthController {
     private final JwtTokenProvider        jwtTokenProvider;
     private final AccountMapper           accountMapper;
     private final EmailService            emailService;
+
+    /** ppurio DB 미설정 시 null (ConditionalOnProperty) */
+    @Autowired(required = false)
+    private SmsService smsService;
 
     /*─────────────────────────────────────────────────────
      * [1] 회원가입 API
@@ -169,26 +175,33 @@ public class AuthController {
             log.debug("임시 비밀번호 발급 결과: {}", newPassword);
 
             if (newPassword != null && !newPassword.isEmpty()) {
-                // 이메일로 임시 비밀번호 발송
-                String targetEmail = null;
+                boolean hasPhone = request.getPhone() != null && !request.getPhone().isBlank();
+                boolean hasEmail = request.getEmail() != null && !request.getEmail().isBlank();
 
-                if (request.getEmail() != null && !request.getEmail().isBlank()) {
-                    // 이메일로 찾기: 입력한 이메일로 발송
-                    targetEmail = request.getEmail();
-                } else if (request.getOpenId() != null && !request.getOpenId().isBlank()) {
-                    // 휴대폰으로 찾기: openId로 계정 조회 후 이메일 발송
-                    Account account = accountMapper.findByOpenId(request.getOpenId());
-                    if (account != null && account.getEmail() != null) {
-                        targetEmail = account.getEmail();
-                    }
-                }
-
-                if (targetEmail != null) {
+                if (hasPhone && smsService != null) {
+                    // 휴대폰으로 찾기: SMS 발송
                     try {
-                        emailService.sendTempPassword(targetEmail, newPassword);
+                        smsService.sendTempPassword(request.getPhone(), newPassword);
                     } catch (Exception e) {
-                        log.error("이메일 발송 실패: {}", e.getMessage());
-                        // 이메일 발송 실패해도 비밀번호는 변경되었으므로 ok 반환
+                        log.error("SMS 발송 실패: {}", e.getMessage());
+                    }
+                } else {
+                    // 이메일로 찾기 (또는 SMS 서비스 미설정 시 이메일 fallback)
+                    String targetEmail = null;
+                    if (hasEmail) {
+                        targetEmail = request.getEmail();
+                    } else if (request.getOpenId() != null && !request.getOpenId().isBlank()) {
+                        Account account = accountMapper.findByOpenId(request.getOpenId());
+                        if (account != null && account.getEmail() != null) {
+                            targetEmail = account.getEmail();
+                        }
+                    }
+                    if (targetEmail != null) {
+                        try {
+                            emailService.sendTempPassword(targetEmail, newPassword);
+                        } catch (Exception e) {
+                            log.error("이메일 발송 실패: {}", e.getMessage());
+                        }
                     }
                 }
             }

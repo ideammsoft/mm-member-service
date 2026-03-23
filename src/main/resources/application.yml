@@ -11,4 +11,3 @@ spring:
   cloud:
     config:
       fail-fast: true   # Config Server 없으면 시작 실패 (optional과 함께 사용)
-
