@@ -17,7 +17,7 @@ CREATE TABLE pds (
     is_active      CHAR(1)      DEFAULT 'Y'               COMMENT '활성화 여부 (Y/N)',
     reg_date       DATETIME     DEFAULT CURRENT_TIMESTAMP  COMMENT '등록일',
     update_date    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일'
-) COMMENT '제품소개 다운로드 게시판';
+) COMMENT '제품소개 다운로드 게시판 new';
 
 -- ===================================================
 -- 초기 데이터 INSERT (현재 화면 기준, 다운로드수 100)

@@ -48,19 +48,18 @@
         select count(*) as cnt from account where open_id=#{openId}
     </select>
     <select id="idFindByEmail" parameterType="String" resultType="String">
-        select count(*) as cnt
-        from (
-        select account_id
-        from account
-        where open_id=#{openId} and email=#{email}
-        order by account_id desc
-        limit 1
-        ) t
+        SELECT open_id
+        FROM account
+        WHERE email = #{email}
+          AND password IS NOT NULL
+        ORDER BY account_id DESC
+        LIMIT 1
     </select>
     <select id="idFindByPhone" parameterType="String" resultType="String">
         SELECT open_id
         FROM account
         WHERE mphone = #{phone}
+          AND password IS NOT NULL
         ORDER BY account_id DESC
         LIMIT 1
     </select>

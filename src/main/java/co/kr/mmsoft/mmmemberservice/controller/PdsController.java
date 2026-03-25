@@ -3,6 +3,7 @@ package co.kr.mmsoft.mmmemberservice.controller;
 import co.kr.mmsoft.mmmemberservice.mybatis.domain.Pds;
 import co.kr.mmsoft.mmmemberservice.service.PdsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +21,18 @@ import java.util.Map;
 public class PdsController {
 
     private final PdsService pdsService;
-
+//    //나의 로컬에서 가져온 변수가 아닌, 외부의 Github에서 가져온 변수에 대한 테스트
+//    @Value("${app.productId}") private Long productId;
+//    @Value("${app.productName}") private String productName;
+//
+//    @GetMapping("/test")
+//    public ResponseEntity<Map<String, Object>> getProductList() {
+//
+//        return ResponseEntity.ok(Map.of(
+//                "productId", productId,
+//                "productName", productName
+//        ));
+//    }
     /** 목록 조회 - 카테고리 필터 */
     @GetMapping
     public ResponseEntity<List<Pds>> getList(@RequestParam(required = false) String category) {
