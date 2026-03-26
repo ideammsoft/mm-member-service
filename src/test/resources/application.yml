@@ -3,9 +3,16 @@ spring:
   application:
     name: mm-member-service
   config:
-    #import: "optional:configserver:http://localhost:1881"  # 테스트 시 Config Server 없어도 무시
     import: "optional:none"
   cloud:
     config:
       enabled: false
       fail-fast: false
+
+# JwtTokenProvider @Value 필수 속성 (application-default.yml은 test 프로파일에서 로드 안 됨)
+app:
+  jwt:
+    secret: dGVzdC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RzLW11c3QtYmUtbG9uZy1lbm91Z2g=
+    access-token-minutes: 15
+    refresh-token-minutes: 20160
+  frontend-url: "http://localhost:5173"
