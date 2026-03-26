@@ -1,0 +1,197 @@
+name: mm-member-service CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_DATABASE: liveshop
+          MYSQL_USER: liveshop
+          MYSQL_PASSWORD: "1234"
+          MYSQL_ROOT_PASSWORD: "1234"
+        options: >-
+          --tmpfs /var/lib/mysql
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p1234 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+
+      rabbitmq:
+        image: rabbitmq:3.12-management-alpine
+        ports:
+          - 5672:5672
+          - 15672:15672
+        env:
+          RABBITMQ_DEFAULT_USER: liveshop
+          RABBITMQ_DEFAULT_PASS: "1234"
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping"
+          --health-interval=10s
+          --health-timeout=10s
+          --health-retries=20
+
+    env:
+      SERVICE_NAME: mm-member-service
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g"
+
+      SPRING_PROFILES_ACTIVE: test
+
+      # Config / Eureka 비활성화
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      SPRING_CONFIG_IMPORT: "optional:none"
+      SPRING_CLOUD_CONFIG_FAIL_FAST: "false"
+      SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED: "false"
+      EUREKA_CLIENT_ENABLED: "false"
+
+      # DB
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/liveshop?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_USERNAME: liveshop
+      SPRING_DATASOURCE_PASSWORD: "1234"
+
+      # Flyway
+      SPRING_FLYWAY_URL: jdbc:mysql://127.0.0.1:3306/liveshop?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+      SPRING_FLYWAY_USER: liveshop
+      SPRING_FLYWAY_PASSWORD: "1234"
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: 127.0.0.1
+      SPRING_DATA_REDIS_PORT: 6379
+
+      # RabbitMQ
+      SPRING_RABBITMQ_HOST: 127.0.0.1
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: liveshop
+      SPRING_RABBITMQ_PASSWORD: "1234"
+
+      # 이미지
+      IMAGE_REGISTRY: ghcr.io
+      IMAGE_OWNER: ${{ github.repository_owner }}
+      IMAGE_NAME: mm-member-service
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Print environment
+        run: |
+          echo "SERVICE_NAME=${SERVICE_NAME}"
+          echo "SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}"
+          echo "SPRING_CONFIG_IMPORT=${SPRING_CONFIG_IMPORT}"
+          echo "SPRING_CLOUD_CONFIG_ENABLED=${SPRING_CLOUD_CONFIG_ENABLED}"
+          echo "EUREKA_CLIENT_ENABLED=${EUREKA_CLIENT_ENABLED}"
+          java -version
+          ./gradlew -v
+
+      - name: Install clients
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client redis-tools
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..60}; do
+            if mysqladmin ping -h 127.0.0.1 -uroot -p1234 --silent; then
+              echo "MySQL is UP"
+              break
+            fi
+            echo "waiting mysql...($i)"
+            sleep 2
+          done
+          mysqladmin ping -h 127.0.0.1 -uroot -p1234 --silent
+
+      - name: Wait for Redis
+        run: |
+          for i in {1..30}; do
+            if redis-cli -h 127.0.0.1 -p 6379 ping | grep -q PONG; then
+              echo "Redis is UP"
+              break
+            fi
+            echo "waiting redis...($i)"
+            sleep 2
+          done
+          redis-cli -h 127.0.0.1 -p 6379 ping
+
+      - name: Wait for RabbitMQ
+        run: |
+          for i in {1..30}; do
+            if bash -c '</dev/tcp/127.0.0.1/5672' 2>/dev/null; then
+              echo "RabbitMQ is UP"
+              break
+            fi
+            echo "waiting rabbitmq...($i)"
+            sleep 2
+          done
+          bash -c '</dev/tcp/127.0.0.1/5672'
+
+      - name: Run tests
+        run: ./gradlew clean test --no-daemon
+
+      - name: Build bootJar
+        run: ./gradlew bootJar --no-daemon
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SERVICE_NAME }}-${{ github.sha }}
+          path: build/libs/*.jar
+          if-no-files-found: error
+
+      - name: Login to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build OCI image with Buildpacks
+        if: github.event_name == 'push'
+        run: |
+          ./gradlew bootBuildImage \
+            --imageName=${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG} \
+            --no-daemon
+
+      - name: Push image to GHCR
+        if: github.event_name == 'push'
+        run: |
+          docker push ${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}

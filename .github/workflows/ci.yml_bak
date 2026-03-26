@@ -1,0 +1,207 @@
+#---------------------------------------------------------------
+# member-service는 데이터 베이스 연동이 필요한 API 서비스 이므로
+# CI 단계에서 단순한 테스트에 그치는 것이 아니라, MySQL 연동 테스트까지 진행해야 실무적임
+# 그러기 위해서는 임시 리눅스에 ,  MySQL 컨테이너를  도커로 실행하고, 그 안에 Provider
+# 테이블 및 record  insert까지 진행해봄
+#---------------------------------------------------------------
+
+#---------------------------------------------------------------
+# [1] 워크플로우 이름 및 시작 조건
+#---------------------------------------------------------------
+name: member-service CI #깃헙 액션 대시보드에 표시될 이 작업의 이름(별명)
+
+on: # 이 작업을 언제 시작할지 지금부터 서술~~
+  push: #개발자가 push할때(자신의 깃헙에)
+    branches: ["main"] # main 브렌치에 코드가 push될때 작업 시작
+
+  pull_request: # 그리고 main 브렌치로 코드를 합쳐달라는 요청이 들어올때도(PR) 작업 시작
+    branches: ["main"]
+
+concurrency: # 동시에 작업이 겹칠 때의 규칙
+  group: ci-${{ github.ref }} # 같은 브랜치에서 일어나는 작업끼지 묶어서
+  cancel-in-progress: true # 새 코드가 들어오면 예전에 돌고있떤 빌드는 취소함 (자원 아끼기 위함)
+
+#DockerImage 를 GHCR에 넣기 위한 권한 부여
+permissions:
+  contents: read #GitHub Repository 소스 코드에 대한 읽기 권한 부여
+  packages: write #GHCR 에 대한 패키지 쓰기 권한 부여
+
+#---------------------------------------------------------------
+# [2] 실행환경 및 가상 DB 설정
+#---------------------------------------------------------------
+jobs:
+  build-test: #빌드와 테스트라는 이름의 작업을 정의
+    runs-on: ubuntu-latest # 깃헙이 빌려주는 최신 리눅스에서 실행함
+
+    #-------------------------MySQL 서버 CI 에서 컨테이너로 실행하기 위한 설정 -----------
+    services:
+      mysql: # mysql 컨테이너로 띄우겠다!!
+        image: mysql:8.0
+        ports:
+          - 3306:3306 # 호스트 3306과 컨테이너 3306을 연결함
+
+        env: # 아래의 변수는 개발자가 임의로 선언하는 변수가 아니라, MySQL 공식 도커 이미지를 만든 개발자들이 미리 설계해둔 약속된 변수임
+          MYSQL_DATABASE: liveshop
+          MYSQL_USER: liveshop
+          MYSQL_PASSWORD: "1234"
+          MYSQL_ROOT_PASSWORD: "1234" # 루트 계정의 비밀번호를 1234로 설정
+          TZ: Asia/Seoul
+
+        options: >- # DB가 완전히 켜졌는지 확인하는 건강 검진(health check) 명령어
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p1234 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+
+    #---------------------------------------------------------------
+    # [3] 공통 환경 변수 설정
+    #---------------------------------------------------------------
+
+    #---------------------애플리케이션이 접속할 DB설정----------------------------
+    env: #이 작업 전체에서 공통으로 사용할 변수들
+      SERVICE_NAME: saga-member-service # 나중에 결과물 이름에 사용할 이름표
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g" #Gradle 메모리를 2BG 제한함
+
+      # CI 환경에서는 Config Server / Eureka Server가 없으므로 모든 설정을 비활성화 시켜야 함, 즉 member-service 단독으로 존재해야 함
+      SPRING_CLOUD_CONFIG_ENABLED: "false"  #끄기
+      SPRING_CONFIG_IMPORT: "optional:none" # 주소 없애기
+      SPRING_CLOUD_CONFIG_FAIL_FAST: "false" # Config Server 연결에 실패해도 빌드를 멈추지 말라는 지시
+      SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED: "false" # (중요) import-check 자체를 끔(없어도 에러로 중단하지 않게)
+      EUREKA_CLIENT_ENABLED: "false"
+      # (선택) 프로젝트에 따라 discovery 전체를 끄는 게 더 확실할 수 있음
+      # SPRING_CLOUD_DISCOVERY_ENABLED: "false"
+
+      #--------------------------------------------------------------------------
+      # [ 테스트 프로필 명시]
+      #--------------------------------------------------------------------------
+      SPRING_PROFILES_ACTIVE: test
+
+      #--------------------------------------------------------------------------
+      # 도커 이미지 생성을 위한 변수들
+      #--------------------------------------------------------------------------
+      IMAGE_REGISTRY: ghcr.io
+      IMAGE_OWNER: ${{ github.repository_owner }} #내장변 전역변수 집합인 GitHub Context중 하나임
+      IMAGE_NAME: saga-member-service
+      IMAGE_TAG: ${{ github.sha}} # 워크플로우를 커밋 시 할당된 고유 ID(SHA-1 해시값)
+
+      #--------------------------------------------------------------------------
+      # DB접속 정보
+      #--------------------------------------------------------------------------
+      # ※ ubuntu runner(VM)에서 services 포트가 열리므로 localhost 사용이 가장 표준적임
+      SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/liveshop
+      SPRING_DATASOURCE_USERNAME: "liveshop"
+      SPRING_DATASOURCE_PASSWORD: "1234"
+
+    #---------------------------------------------------------------
+    # [4] 실행 단계
+    #---------------------------------------------------------------
+
+    # 1단계: 내 코드를 가상 리눅스 컴퓨터로 가져오기
+    steps:
+      - name: 워크플로우 서버(임시 리눅스)로 소스 가져오기( Checkout)
+        uses: actions/checkout@v4 #깃헙에서 공식적으로 만든 코드 가져오기 전용 도구
+
+      # 2단계: Java 21 버전 설치
+      - name: Set up Java 21(Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle # 라이브러리를 캐시해서 다음 빌드 땐 더 빠르게 만들기
+
+      # 3단계: Gradle 에 실행 권한 부여
+      - name: gradle에 실행권 부여
+        run: chmod +x gradlew
+
+      # 3-1단계: 중간점검을 위한 환경변수 출력(선택사항-내가 임의로 넣음 )
+      - name: 환경변수 출력
+        run: |
+          echo "SERVICE_NAME=${SERVICE_NAME}"
+          echo "SPRING_CLOUD_CONFIG_ENABLED=${SPRING_CLOUD_CONFIG_ENABLED}"
+          echo "SPRING_CONFIG_IMPORT=${SPRING_CONFIG_IMPORT}"
+          echo "SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}"
+          echo "SPRING_CLOUD_CONFIG_FAIL_FAST=${SPRING_CLOUD_CONFIG_FAIL_FAST}"
+          echo "EUREKA_CLIENT_ENABLED=${EUREKA_CLIENT_ENABLED}"
+
+      # 4단계: DB 상태 확인을 위해 MySQL 클라이언트 리눅스에 설치
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+
+      # 5단계: 현재 설정된 정보들을 로그에 찍어 확인
+      - name: Print environment
+        run: |
+          echo "SERVICE_NAME=${SERVICE_NAME}"
+          echo "SPRING_CLOUD_CONFIG_ENABLED=${SPRING_CLOUD_CONFIG_ENABLED}"
+          echo "SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED=${SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED}"
+          java -version
+          ./gradlew -v
+
+      # 6단계: MySQL이 켜질때까지 최대 2분 동안 기다림
+      - name: Wait for MySQL
+        run: |
+          for i in {1..60}; do
+            if mysqladmin ping -h 127.0.0.1 -uroot -p1234 --silent; then
+              echo "MySQL is UP"
+              exit 0
+            fi
+            echo "waiting mysql... ($i)"
+            sleep 2
+          done
+          echo "MySQL failed to start"
+          exit 1
+
+      # 7단계: 테스트 코드 돌림 (제일 중요한 순간!!!!!!!!!!!!)
+      # 테스트란, CI의 목적이면서 가장 마지막단계임, 즉 문제가 없는 코드만 CD 를 수행하기 위한 선행작업
+      - name: Test 실행해보기
+        env:
+          # test 프로필을 써서 로컬 설정과 섞이지 않게 함..
+          SPRING_PROFILES_ACTIVE: test
+
+          # CI 환경에서는 Config Server / Eureka Server가 없으므로 모든 설정을 비활성화
+          SPRING_CLOUD_CONFIG_ENABLED: "false"
+          SPRING_CONFIG_IMPORT: "optional:none"
+          SPRING_CLOUD_CONFIG_FAIL_FAST: "false"
+          SPRING_CLOUD_CONFIG_IMPORT_CHECK_ENABLED: "false"
+          EUREKA_CLIENT_ENABLED: "false"
+
+          # DB 접속정보(테스트 단계에서 명시적으로 한번 더 고정)
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/liveshop
+          SPRING_DATASOURCE_USERNAME: "liveshop"
+          SPRING_DATASOURCE_PASSWORD: "1234"
+        run: ./gradlew test
+
+      # 8단계: 테스트가 통과되면 실제 실행 파일인 JAR생성
+      - name: Build bootJar
+        run: ./gradlew bootJar
+
+      # 9단계: 가상 리눅스가 만든 JAR 파일을 깃헙 웹사이트에 업로드해 보관
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SERVICE_NAME}}-${{ github.sha }} #JAR파일을 이름표-커밋번호 형식'으로 저장해달라
+          path: build/libs/*.jar #가상 리눅스 디렉토리에 있는 jar파일의 위치
+          if-no-files-found: error # 파일이 없으면 에러를 발생시켜라
+
+      #----------------------------------------------------------------------------------------------
+      # 7) 도커 이미지 빌드 및 푸시(GHCR) : GitHub Container Registry (생성된 도커 이미지를 보관하는 깃헙이 제공하는 창고)
+      #----------------------------------------------------------------------------------------------
+      - name: Login to GHCR(도커이미지 만들어서 GHCR에 Push 하기)
+        if: github.event_name == 'push' #PR에서는 보통 GHCR에 Dockerfile 을 저장하지 않기 위해..즉 push 이벤트에 대해서만 GHCR에 로그인 시키겟음
+        uses: docker/login-action@v3 #깃헙에서 만든 깃헙 로그인용 툴
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }} #GHCR의 주소
+          username: ${{ github.actor }} #지금 사용중인 github사용자 계정
+          password: ${{ secrets.GITHUB_TOKEN }} # 로그인에 사용중인 PAT
+
+      - name: Build OCI Image By 스프링부트 제공 Buildpacks 이용 ( Dockerfile없이 이미지를 생성하는 툴)
+        if: github.event_name == 'push'
+        run: |
+          ./gradlew bootBuildImage \
+            --imageName=${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: GHCR로 Push(가상 리눅스에서 GHCR로 전송)
+        if: github.event_name == 'push'
+        run: |
+          docker push ${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}
