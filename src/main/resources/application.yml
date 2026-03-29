@@ -1,7 +1,10 @@
 spring:
   application:
-    name: mm-member-service   # Config Server가 이 이름으로 GitHub에서 mm-member-service-dev.yml 조회
+    name: mm-member-service  # Config Server가 이 이름으로 GitHub에서 mm-member-service-dev.yml 조회
   profiles:
     active: dev
   config:
-    import: "optional:configserver:http://localhost:1881"
+    import: "optional:configserver:http://mm-config-server:1882"
+
+mybatis:
+  mapper-locations: classpath:mybatis/mapper/*.xml
