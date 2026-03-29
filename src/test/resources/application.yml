@@ -12,7 +12,7 @@ spring:
 # JwtTokenProvider @Value 필수 속성 (application-default.yml은 test 프로파일에서 로드 안 됨)
 app:
   jwt:
-    secret: kjkljlk
+    secret: testSecretKeyForJWTTokenThatIsAtLeast32Chars!
     access-token-minutes: 15
     refresh-token-minutes: 20160
-  frontend-url: "http://localhost:5173"
+  frontend-url: "http://oauth.mmsoft.co.kr:1761"
