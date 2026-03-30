@@ -10,6 +10,10 @@ spring:
       fail-fast: false
 
 # JwtTokenProvider @Value 필수 속성 (application-default.yml은 test 프로파일에서 로드 안 됨)
+mybatis:
+  mapper-locations: classpath:mybatis/mapper/*.xml
+  type-aliases-package: co.kr.mmsoft.mmmemberservice.mybatis.domain
+
 app:
   jwt:
     secret: testSecretKeyForJWTTokenThatIsAtLeast32Chars!
