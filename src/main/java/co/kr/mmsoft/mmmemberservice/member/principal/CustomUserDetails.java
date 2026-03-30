@@ -72,6 +72,12 @@ public class CustomUserDetails implements UserDetails {
         // 역할과 권한을 담을 빈 목록을 준비
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
 
+        // 역할이 없으면 일반 사용자(customer)로 기본 적용
+        if (account.getRoleList() == null || account.getRoleList().isEmpty()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_customer"));
+            return authorities;
+        }
+
         // 이 회원이 가진 모든 역할을 순서대로 처리
         for (Role role : account.getRoleList()) {
             log.debug("이 계정이 보유한 역할의 이름: {}", role.getRoleName());

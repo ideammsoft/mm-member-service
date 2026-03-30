@@ -63,7 +63,11 @@ public class CustomUserDetailsService implements UserDetailsService {
         }
 
         log.debug("로그인한 유저의 이메일: {}", account.getEmail());
-        log.debug("로그인한 유저의 역할: {}", account.getRoleList().get(0).getRoleName());
+        if (account.getRoleList() != null && !account.getRoleList().isEmpty()) {
+            log.debug("로그인한 유저의 역할: {}", account.getRoleList().get(0).getRoleName());
+        } else {
+            log.debug("로그인한 유저의 역할 없음 → customer 기본 적용");
+        }
 
         // Account를 CustomUserDetails로 감싸서 반환
         // Spring Security가 이 객체로 비밀번호를 검증합니다
