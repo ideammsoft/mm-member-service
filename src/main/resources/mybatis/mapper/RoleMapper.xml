@@ -21,7 +21,7 @@
     </select>
 
 <!--    회원가입 시 특정 계정이 보유할 role을 반환-->
-    <select id="findByRoleName" parameterType="String" resultType="Role">
+    <select id="findByRoleName" parameterType="String" resultMap="RoleMap">
         select role_id, role_name from role where role_name=#{role_name}
     </select>
 </mapper>
