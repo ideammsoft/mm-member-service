@@ -8,3 +8,4 @@ spring:
 
 mybatis:
   mapper-locations: classpath:mybatis/mapper/*.xml
+  type-aliases-package: co.kr.mmsoft.mmmemberservice.mybatis.domain
