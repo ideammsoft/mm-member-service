@@ -80,7 +80,11 @@ public class AuthController {
         log.debug("회원가입 요청 name: {}", registRequest.getName());
 
         // 서비스에게 회원가입 처리 위임
-        authService.regist(registRequest);
+        try {
+            authService.regist(registRequest);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(409).body(Map.of("msg", e.getMessage()));
+        }
 
         // ResponseEntity.ok(): 200 OK 상태코드로 응답
         // Map.of("msg", "ok"): { "msg": "ok" } JSON으로 자동 변환

@@ -78,6 +78,11 @@ public class AuthService {
      * ========================================*/
     public void regist(RegistRequest registRequest) {
 
+        // 아이디 중복 체크 (직접 API 호출 없이 가입 시도해도 막음)
+        if (accountMapper.checkByOpenId(registRequest.getOpenId()) > 0) {
+            throw new IllegalArgumentException("이미 사용 중인 아이디입니다: " + registRequest.getOpenId());
+        }
+
         // provider 테이블에서 "homepage" 공급자 정보 조회
         // (직접 가입이므로 항상 "homepage")
         Provider provider = providerMapper.findByProviderName("homepage");
