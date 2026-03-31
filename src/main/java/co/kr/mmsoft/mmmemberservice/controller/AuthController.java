@@ -110,7 +110,7 @@ public class AuthController {
         try {
             authTokens = authService.login(loginRequest);
         } catch (Exception e) {
-            log.debug("로그인 실패: {}", e.getMessage());
+            log.error("로그인 실패: {} - {}", e.getClass().getSimpleName(), e.getMessage());
             return ResponseEntity.status(401)
                     .body(Map.of("message", "아이디 또는 비밀번호가 올바르지 않습니다."));
         }
