@@ -6,13 +6,18 @@
 <!--    <select id="selectBlog" resultType="Blog">-->
 <!--        select * from Blog where id = #{id}-->
 <!--    </select>-->
+    <resultMap id="ProviderMap" type="Provider">
+        <id column="provider_id" property="providerId"/>
+        <result column="provider_name" property="providerName"/>
+    </resultMap>
+
     <!-- 이름으로 정보 가져오기 -->
-    <select id = "findByProviderName" parameterType="String" resultType="co.kr.mmsoft.mmmemberservice.mybatis.domain.Provider">
+    <select id="findByProviderName" parameterType="String" resultMap="ProviderMap">
         select provider_id, provider_name
         from provider
         where provider_name=#{providerName}
     </select>
-    <select id = "findByProviderId" parameterType="int" resultType="co.kr.mmsoft.mmmemberservice.mybatis.domain.Provider">
+    <select id="findByProviderId" parameterType="int" resultMap="ProviderMap">
         select provider_id, provider_name
         from provider
         where provider_id=#{providerId}
