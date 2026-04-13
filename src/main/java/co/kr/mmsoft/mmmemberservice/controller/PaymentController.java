@@ -40,80 +40,77 @@ public class PaymentController {
     }
 
     // -----------------------------------------------------------------------
-    // KSPayRcv.asp 대체: KSPay 팝업 → 부모 창 paramSet 호출 → 팝업 닫기
+    // KSPayRcv.asp 대체: KSPay 결제 완료 → 직접 DB 처리 → 팝업에 결과 HTML 반환
+    // sndReply URL 에 ?id=userId 포함하여 호출됨
     // -----------------------------------------------------------------------
     @PostMapping(value = "/kspayrec", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> kspayrec(HttpServletRequest req) {
 
+        // sndReply URL 쿼리 파라미터에서 사용자 ID 추출
+        String id = req.getParameter("id");
+        if (id == null) id = "";
+
         // KSPay 전문 유형별 결과 파라미터 파싱 (원본 KSPayRcv.asp 로직 동일)
         String approvalType = param(req, "reApprovalType");
-        String authyn, trno, trddt, trdtm, amt, authno, msg1, msg2, ordno, isscd, aqucd, result;
+        String authyn, amt, msg1, msg2, ordno;
 
         char type = approvalType.isEmpty() ? '0' : approvalType.charAt(0);
 
         if (type == '1' || type == 'I') {        // 신용카드 (MPI / ISP)
             authyn = param(req, "reStatus");
-            trno   = param(req, "reTransactionNo");
-            trddt  = param(req, "reTradeDate");
-            trdtm  = param(req, "reTradeTime");
             amt    = param(req, "reAmount");
-            authno = param(req, "reAuthno");
             msg1   = param(req, "reMessage1");
             msg2   = param(req, "reMessage2");
             ordno  = param(req, "reOrderNumber");
-            isscd  = param(req, "reIssCode");
-            aqucd  = param(req, "reAquCode");
         } else if (type == '4') {                // 포인트
             authyn = param(req, "rePStatus");
-            trno   = param(req, "rePTransactionNo");
-            trddt  = param(req, "rePTradeDate");
-            trdtm  = param(req, "rePTradeTime");
             amt    = param(req, "reAmount");
-            authno = param(req, "rePAuthno");
             msg1   = param(req, "rePMessage1");
             msg2   = param(req, "rePMessage2");
             ordno  = param(req, "reOrderNumber");
-            isscd  = param(req, "rePIssCode");
-            aqucd  = "";
         } else if (type == '6' || type == '2') { // 가상계좌 / 계좌이체
             authyn = param(req, "reVAStatus");
-            trno   = param(req, "reVATransactionNo");
-            trddt  = param(req, "reVATradeDate");
-            trdtm  = param(req, "reVATradeTime");
             amt    = param(req, "reAmount");
-            authno = param(req, "reVABankCode");
             msg1   = param(req, "reVAMessage1");
             msg2   = param(req, "reVAMessage2");
             ordno  = param(req, "reOrderNumber");
-            isscd  = param(req, "reVAVirAcctNo");
-            aqucd  = "";
         } else if (type == '7') {               // 월드패스
             authyn = param(req, "reWPStatus");
-            trno   = param(req, "reWPTransactionNo");
-            trddt  = param(req, "reWPTradeDate");
-            trdtm  = param(req, "reWPTradeTime");
             amt    = param(req, "reAmount");
-            authno = param(req, "reWPAuthNo");
             msg1   = param(req, "reWPMessage1");
             msg2   = param(req, "reWPMessage2");
             ordno  = param(req, "reOrderNumber");
-            isscd  = "";
-            aqucd  = "";
         } else {
-            authyn = ""; trno = ""; trddt = ""; trdtm = ""; amt = "";
-            authno = ""; msg1 = ""; msg2  = ""; ordno  = ""; isscd = ""; aqucd = "";
+            authyn = ""; amt = ""; msg1 = ""; msg2 = ""; ordno = "";
         }
-        result = approvalType;
 
-        log.info("KSPayRcv - authyn={}, amt={}, ordno={}", authyn, amt, ordno);
+        log.info("KSPayRcv - authyn={}, amt={}, ordno={}, id={}", authyn, amt, ordno, id);
 
-        // 부모 창 paramSet → goResult → 팝업 닫기 (원본 KSPayRcv.asp 동일)
-        String html = buildKsPayRcvHtml(authyn, trno, trddt, trdtm, authno,
-                ordno, msg1, msg2, amt, "", isscd, aqucd, "", result);
+        boolean success = "O".equalsIgnoreCase(authyn);
 
+        if (success) {
+            try {
+                int price = Integer.parseInt(amt);
+                String finalId = id;
+                paymentService.ifPresentOrElse(
+                        svc -> svc.processPaymentSuccess(finalId, price),
+                        ()  -> log.warn("PaymentService 미설정 - mssql-manyman 설정을 확인하세요")
+                );
+            } catch (NumberFormatException e) {
+                log.error("결제금액 파싱 오류 - amt={}", amt);
+                success = false;
+            } catch (Exception e) {
+                log.error("결제 DB 처리 중 오류 - id={}", id, e);
+                success = false;
+            }
+        } else {
+            log.warn("결제 실패 응답 - authyn={}, msg={}", authyn, msg1);
+        }
+
+        String msg = msg1 + (msg2.isBlank() ? "" : " " + msg2);
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
-                .body(html);
+                .body(buildResultHtml(success, id, amt, msg));
     }
 
     // -----------------------------------------------------------------------
@@ -163,39 +160,6 @@ public class PaymentController {
     private String param(HttpServletRequest req, String name) {
         String v = req.getParameter(name);
         return v == null ? "" : v.trim();
-    }
-
-    /** KSPayRcv 응답 HTML: opener.paramSet → opener.goResult → close */
-    private String buildKsPayRcvHtml(String authyn, String trno, String trdt, String trtm,
-                                     String authno, String ordno, String msg1, String msg2,
-                                     String amt, String tempV, String isscd, String aqucd,
-                                     String remark, String result) {
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
-                + "<script>"
-                + "function init(){"
-                + "top.opener.paramSet("
-                + esc(authyn) + "," + esc(trno)   + "," + esc(trdt)   + "," + esc(trtm) + ","
-                + esc(authno) + "," + esc(ordno)  + "," + esc(msg1)   + "," + esc(msg2) + ","
-                + esc(amt)    + "," + esc(tempV)  + "," + esc(isscd)  + "," + esc(aqucd) + ","
-                + esc(remark) + "," + esc(result)
-                + ");"
-                + "top.opener.goResult();"
-                + "window.close();"
-                + "}"
-                + "</script>"
-                + "</head>"
-                + "<body onload=\"init();\"></body></html>";
-    }
-
-    /** JS 문자열 이스케이프 + 따옴표 감싸기 */
-    private String esc(String s) {
-        if (s == null) s = "";
-        s = s.replace("\\", "\\\\")
-             .replace("\"", "\\\"")
-             .replace("'",  "\\'")
-             .replace("\r", "")
-             .replace("\n", "");
-        return "\"" + s + "\"";
     }
 
     /** 결제 결과 HTML 페이지 */
