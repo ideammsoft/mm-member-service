@@ -87,10 +87,14 @@ public class PaymentController {
         log.info("KSPayRcv - authyn={}, amt={}, ordno={}, id={}", authyn, amt, ordno, id);
 
         boolean success = "O".equalsIgnoreCase(authyn);
+        String formatted = "";
 
         if (success) {
             try {
                 int price = Integer.parseInt(amt);
+                try {
+                    formatted = String.format("%,d", price);
+                } catch (Exception ignored) {}
                 String finalId = id;
                 paymentService.ifPresentOrElse(
                         svc -> svc.processPaymentSuccess(finalId, price),
@@ -107,10 +111,12 @@ public class PaymentController {
             log.warn("결제 실패 응답 - authyn={}, msg={}", authyn, msg1);
         }
 
-        String msg = msg1 + (msg2.isBlank() ? "" : " " + msg2);
+        String msg = msg1 + (msg2.isEmpty() ? "" : " " + msg2);
+
+        // 팝업 내부 프레임에서 실행: 부모창(authfrm.html)에 결과 통보 후 팝업 닫기
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
-                .body(buildResultHtml(success, id, amt, msg));
+                .body(buildKsPayRcvJs(success, formatted, msg));
     }
 
     // -----------------------------------------------------------------------
@@ -160,6 +166,42 @@ public class PaymentController {
     private String param(HttpServletRequest req, String name) {
         String v = req.getParameter(name);
         return v == null ? "" : v.trim();
+    }
+
+    /**
+     * KSPay 팝업 내부 프레임에서 실행되는 JS:
+     *   1) top.opener.paymentResult() → authfrm.html에 결과 통보
+     *   2) window.close() → 팝업 전체 닫기 (IE: iframe에서 호출 시 top window 닫힘)
+     */
+    private String buildKsPayRcvJs(boolean success, String formatted, String msg) {
+        String okStr  = success ? "true" : "false";
+        String amtEsc = esc(formatted);
+        String msgEsc = esc(msg);
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+                + "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
+                + "<script>"
+                + "function init(){"
+                + "try{"
+                + "if(top.opener&&top.opener.paymentResult){"
+                + "top.opener.paymentResult(" + okStr + "," + amtEsc + "," + msgEsc + ");"
+                + "}"
+                + "}catch(e){}"
+                + "window.close();"
+                + "}"
+                + "</script>"
+                + "</head>"
+                + "<body onload=\"init();\"></body></html>";
+    }
+
+    /** JS 문자열 이스케이프 + 따옴표 감싸기 */
+    private String esc(String s) {
+        if (s == null) s = "";
+        s = s.replace("\\", "\\\\")
+             .replace("\"", "\\\"")
+             .replace("'",  "\\'")
+             .replace("\r", "")
+             .replace("\n", "");
+        return "\"" + s + "\"";
     }
 
     /** 결제 결과 HTML 페이지 (IE 호환) */
