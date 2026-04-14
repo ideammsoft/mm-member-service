@@ -162,49 +162,48 @@ public class PaymentController {
         return v == null ? "" : v.trim();
     }
 
-    /** 결제 결과 HTML 페이지 */
+    /** 결제 결과 HTML 페이지 (IE 호환) */
     private String buildResultHtml(boolean success, String id, String price, String msg) {
         String color     = success ? "#1a73e8" : "#e53e3e";
-        String icon      = success ? "✓" : "✗";
+        String bgColor   = success ? "#e8f0fe" : "#fff5f5";
         String title     = success ? "결제가 완료되었습니다" : "결제가 완료되지 않았습니다";
         String formatted = "";
-        if (price != null && !price.isBlank()) {
+        if (price != null && !price.isEmpty()) {
             try {
                 formatted = String.format("%,d원", Integer.parseInt(price));
             } catch (NumberFormatException ignored) {}
         }
         String detail = success
-                ? (formatted.isBlank() ? "" : formatted + " 충전이 정상 처리되었습니다.<br>")
+                ? (formatted.isEmpty() ? "" : formatted + " 충전이 정상 처리되었습니다.<br>")
                   + "프로그램을 다시 시작해 주세요."
-                : (msg.isBlank() ? "결제가 취소되었거나 오류가 발생했습니다." : msg)
+                : (msg == null || msg.isEmpty() ? "결제가 취소되었거나 오류가 발생했습니다." : msg)
                   + "<br>창을 닫고 다시 시도해 주세요.";
 
         return "<!DOCTYPE html><html lang=\"ko\"><head>"
                 + "<meta charset=\"UTF-8\">"
-                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">"
+                + "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
                 + "<title>" + (success ? "결제 완료" : "결제 실패") + "</title>"
-                + "<link href=\"https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap\" rel=\"stylesheet\">"
                 + "<style>"
-                + "body{font-family:'Noto Sans KR',sans-serif;background:#f0f4f8;"
-                + "min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0;padding:20px;box-sizing:border-box;}"
-                + ".card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.10);"
-                + "padding:40px 32px;text-align:center;max-width:400px;width:100%;}"
-                + ".icon{width:64px;height:64px;border-radius:50%;background:" + color + ";"
-                + "display:flex;align-items:center;justify-content:center;"
-                + "font-size:32px;color:#fff;margin:0 auto 20px;}"
-                + "h2{font-size:20px;font-weight:700;color:#2d3748;margin-bottom:12px;}"
-                + "p{font-size:14px;color:#718096;line-height:1.8;margin-bottom:24px;}"
-                + ".btn{display:inline-block;padding:12px 28px;background:" + color + ";"
-                + "color:#fff;border:none;border-radius:8px;font-size:15px;"
-                + "font-family:'Noto Sans KR',sans-serif;font-weight:600;cursor:pointer;"
-                + "text-decoration:none;}"
+                + "body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:" + bgColor + ";margin:0;padding:30px 20px;text-align:center;}"
+                + ".box{background:#fff;border:2px solid " + color + ";border-radius:8px;padding:30px 24px;max-width:380px;margin:0 auto;}"
+                + ".ttl{font-size:16px;font-weight:bold;color:" + color + ";margin-bottom:14px;}"
+                + ".msg{font-size:13px;color:#555;line-height:1.8;margin-bottom:20px;}"
+                + ".btn{padding:8px 24px;background:" + color + ";color:#fff;border:none;border-radius:4px;font-size:13px;"
+                + "font-family:'맑은 고딕','Malgun Gothic',sans-serif;font-weight:bold;cursor:pointer;}"
+                + ".cnt{font-size:11px;color:#999;margin-top:10px;}"
                 + "</style></head><body>"
-                + "<div class=\"card\">"
-                + "<div class=\"icon\">" + icon + "</div>"
-                + "<h2>" + title + "</h2>"
-                + "<p>" + detail + "</p>"
+                + "<div class=\"box\">"
+                + "<div class=\"ttl\">" + title + "</div>"
+                + "<div class=\"msg\">" + detail + "</div>"
                 + "<button class=\"btn\" onclick=\"window.close()\">닫기</button>"
+                + "<div class=\"cnt\" id=\"cnt\"></div>"
                 + "</div>"
+                + "<script>"
+                + "var s=5;"
+                + "function tick(){if(s<=0){window.close();return;}"
+                + "document.getElementById('cnt').innerHTML=s+'초 후 자동으로 닫힙니다';s--;setTimeout(tick,1000);}"
+                + "tick();"
+                + "</script>"
                 + "</body></html>";
     }
 }
