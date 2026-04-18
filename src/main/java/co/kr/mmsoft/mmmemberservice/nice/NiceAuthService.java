@@ -104,7 +104,7 @@ public class NiceAuthService {
                 throw new RuntimeException("NICE 복호화 실패: " + iReturn);
             }
 
-            String plain = niceCheck.getPlainTxt();
+            String plain = niceCheck.getPlainData();
             log.info("NICE 복호화 결과: {}", plain);
 
             Map<String, String> fields = parsePlainData(plain);
