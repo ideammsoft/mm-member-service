@@ -60,6 +60,12 @@ public class SecurityConfig {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    @Value("${app.frontend-url-www:}")
+    private String frontendUrlWww;
+
+    @Value("${app.frontend-url-naked:}")
+    private String frontendUrlNaked;
+
     // JWT 검증 필터 (매 요청마다 Authorization 헤더의 토큰을 검사)
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -120,7 +126,11 @@ public class SecurityConfig {
         // 허용할 출처(Origin) 설정
         // 주의: "*" (와일드카드)은 allowCredentials(true)와 함께 사용 불가!
         //       반드시 정확한 URL을 지정해야 합니다.
-        config.setAllowedOrigins(List.of(frontendUrl)); // 예) "http://localhost:5173"
+        List<String> origins = new java.util.ArrayList<>();
+        origins.add(frontendUrl);
+        if (frontendUrlWww != null && !frontendUrlWww.isEmpty()) origins.add(frontendUrlWww);
+        if (frontendUrlNaked != null && !frontendUrlNaked.isEmpty()) origins.add(frontendUrlNaked);
+        config.setAllowedOrigins(origins);
 
         // 허용할 HTTP 메서드
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

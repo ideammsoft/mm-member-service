@@ -61,6 +61,8 @@ app:
     access-token-minutes: 15
     refresh-token-minutes: 20160 #14일
   frontend-url: "http://oauth.mmsoft.co.kr"
+  frontend-url-www: "https://www.mmsoft.co.kr"
+  frontend-url-naked: "https://mmsoft.co.kr"
 
   # MSSQL manymen_ppurio - SMS 전송 등록용 (ums_data INSERT)
   mssql-ppurio:
