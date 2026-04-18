@@ -34,10 +34,10 @@ public class NiceAuthService {
     @Value("${nice.site-password:nlGcSndlMVTw}")
     private String sitePassword;
 
-    @Value("${nice.return-url:https://www.mmsoft.co.kr/api/auth/nice/success}")
+    @Value("${nice.return-url:https://m.mmsoft.co.kr/api/auth/nice/success}")
     private String returnUrl;
 
-    @Value("${nice.error-url:https://www.mmsoft.co.kr/api/auth/nice/fail}")
+    @Value("${nice.error-url:https://m.mmsoft.co.kr/api/auth/nice/fail}")
     private String errorUrl;
 
     private static final String NICE_FORM_URL =

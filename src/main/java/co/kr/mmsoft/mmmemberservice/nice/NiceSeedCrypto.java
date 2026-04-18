@@ -41,19 +41,24 @@ public class NiceSeedCrypto {
      */
     public static String encrypt(String plainText, String siteCode, String sitePass) {
         try {
-            byte[] key    = toKey16(sitePass);
-            byte[] iv     = toKey16(siteCode);
-            byte[] plain  = plainText.getBytes(EUC_KR);
+            byte[] key   = toKey16(sitePass);
+            byte[] iv    = toKey16(siteCode);
+            byte[] plain = plainText.getBytes(EUC_KR);
 
-            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(
-                    new CBCBlockCipher(new SEEDEngine()), new PKCS7Padding());
-            cipher.init(true, new ParametersWithIV(new KeyParameter(key), iv));
+            // Zero 패딩: 16바이트 블록 단위로 0x00 채움 (CPClient DLL 방식)
+            int paddedLen = ((plain.length + 15) / 16) * 16;
+            byte[] padded = new byte[paddedLen];
+            System.arraycopy(plain, 0, padded, 0, plain.length);
 
-            byte[] out  = new byte[cipher.getOutputSize(plain.length)];
-            int    len  = cipher.processBytes(plain, 0, plain.length, out, 0);
-            len += cipher.doFinal(out, len);
+            org.bouncycastle.crypto.BlockCipher engine = new CBCBlockCipher(new SEEDEngine());
+            engine.init(true, new ParametersWithIV(new KeyParameter(key), iv));
 
-            return Base64.getEncoder().encodeToString(java.util.Arrays.copyOf(out, len));
+            byte[] out = new byte[paddedLen];
+            for (int i = 0; i < paddedLen; i += 16) {
+                engine.processBlock(padded, i, out, i);
+            }
+
+            return Base64.getEncoder().encodeToString(out);
         } catch (Exception e) {
             throw new RuntimeException("NICE SEED 암호화 실패", e);
         }
