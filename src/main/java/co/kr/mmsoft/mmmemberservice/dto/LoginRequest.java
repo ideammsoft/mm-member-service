@@ -9,3 +9,4 @@ public class LoginRequest {
     private String homepageId;
     private String password;
 }
+

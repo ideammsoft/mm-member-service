@@ -49,6 +49,12 @@ spring:
             enable: true
             required: true
 
+nice:
+  site-code: AB501
+  site-password: nlGcSndlMVTw
+  return-url: https://www.mmsoft.co.kr/api/auth/nice/success
+  error-url: https://www.mmsoft.co.kr/api/auth/nice/fail
+
 app:
   jwt:
     secret: mm-secret-key-for-jwt-token-signing-must-be-long-enough

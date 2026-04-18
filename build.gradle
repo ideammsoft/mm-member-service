@@ -79,6 +79,9 @@ dependencies {
     // OAuth2 소셜 로그인 (Google, Naver, Kakao)
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
+    // NICE 본인인증 SEED-128 암호화 (Bouncy Castle)
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
