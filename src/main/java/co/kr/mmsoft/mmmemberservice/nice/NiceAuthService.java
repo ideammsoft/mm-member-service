@@ -54,6 +54,10 @@ public class NiceAuthService {
         String plainData = buildPlainData(requestNo, authType);
         String encData   = NiceSeedCrypto.encrypt(plainData, siteCode, sitePassword);
 
+        log.info("[NICE] siteCode={}, sitePassword={}", siteCode, sitePassword);
+        log.info("[NICE] plainData={}", plainData);
+        log.info("[NICE] encData length={}, encData={}", encData.length(), encData);
+
         // 요청번호를 Redis에 임시 저장 (결과 수신 시 대조용)
         redisTemplate.opsForValue().set(REDIS_PREFIX + "req:" + requestNo, "pending", RESULT_TTL);
 
