@@ -3,7 +3,25 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="co.kr.mmsoft.mmmemberservice.mybatis.mapper.PdsMapper">
 
-    <select id="findAll" resultType="Pds">
+    <resultMap id="PdsMap" type="Pds">
+        <id     property="pdsId"         column="pds_id"/>
+        <result property="title"         column="title"/>
+        <result property="content"       column="content"/>
+        <result property="osInfo"        column="os_info"/>
+        <result property="version"       column="version"/>
+        <result property="fileSize"      column="file_size"/>
+        <result property="downloadCount" column="download_count"/>
+        <result property="thumbnail"     column="thumbnail"/>
+        <result property="downloadUrl"   column="download_url"/>
+        <result property="category"      column="category"/>
+        <result property="sortOrder"     column="sort_order"/>
+        <result property="publishedAt"   column="published_at"/>
+        <result property="isActive"      column="is_active"/>
+        <result property="regDate"       column="reg_date"/>
+        <result property="updateDate"    column="update_date"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="PdsMap">
         SELECT pds_id, title, content, os_info, version, file_size, download_count,
                thumbnail, download_url, category, sort_order, published_at, is_active, reg_date, update_date
         FROM pds
@@ -14,7 +32,7 @@
         ORDER BY sort_order ASC, pds_id ASC
     </select>
 
-    <select id="findById" resultType="Pds">
+    <select id="findById" resultMap="PdsMap">
         SELECT pds_id, title, content, os_info, version, file_size, download_count,
                thumbnail, download_url, category, sort_order, published_at, is_active, reg_date, update_date
         FROM pds
