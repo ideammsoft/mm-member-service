@@ -1,5 +1,6 @@
 package co.kr.mmsoft.mmmemberservice.nice;
 
+import NiceID.Check.CPClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,7 +10,6 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * NICE 본인인증 (구형 CheckPlus v1) 서비스
@@ -34,10 +34,10 @@ public class NiceAuthService {
     @Value("${nice.site-password:nlGcSndlMVTw}")
     private String sitePassword;
 
-    @Value("${nice.return-url:https://m.mmsoft.co.kr/api/auth/nice/success}")
+    @Value("${nice.return-url:https://www.mmsoft.co.kr/api/auth/nice/success}")
     private String returnUrl;
 
-    @Value("${nice.error-url:https://m.mmsoft.co.kr/api/auth/nice/fail}")
+    @Value("${nice.error-url:https://www.mmsoft.co.kr/api/auth/nice/fail}")
     private String errorUrl;
 
     private static final String NICE_FORM_URL =
@@ -49,24 +49,48 @@ public class NiceAuthService {
     // 1. 인증 요청 데이터 생성
     // ──────────────────────────────────────────────
     public NiceAuthRequestData buildRequest(String authType) {
-        String requestNo = UUID.randomUUID().toString().replace("-", "").substring(0, 30);
+        try {
+            CPClient niceCheck = new CPClient();
 
-        String plainData = buildPlainData(requestNo, authType);
-        String encData   = NiceSeedCrypto.encrypt(plainData, siteCode, sitePassword);
+            String requestNo = niceCheck.getRequestNO(siteCode);
+            if (requestNo == null || requestNo.isEmpty()) {
+                requestNo = "REQ" + System.currentTimeMillis();
+            }
 
-        log.info("[NICE] siteCode={}, sitePassword={}", siteCode, sitePassword);
-        log.info("[NICE] plainData={}", plainData);
-        log.info("[NICE] encData length={}, encData={}", encData.length(), encData);
+            String sAuthType = (authType == null || authType.isEmpty()) ? "M" : authType;
 
-        // 요청번호를 Redis에 임시 저장 (결과 수신 시 대조용)
-        redisTemplate.opsForValue().set(REDIS_PREFIX + "req:" + requestNo, "pending", RESULT_TTL);
+            String sPlainData = "7:REQ_SEQ" + requestNo.getBytes().length + ":" + requestNo
+                    + "8:SITECODE" + siteCode.getBytes().length + ":" + siteCode
+                    + "9:AUTH_TYPE" + sAuthType.getBytes().length + ":" + sAuthType
+                    + "7:RTN_URL" + returnUrl.getBytes().length + ":" + returnUrl
+                    + "7:ERR_URL" + errorUrl.getBytes().length + ":" + errorUrl
+                    + "9:CUSTOMIZE" + "0:";
 
-        return NiceAuthRequestData.builder()
-                .formUrl(NICE_FORM_URL)
-                .siteCode(siteCode)
-                .encData(encData)
-                .requestNo(requestNo)
-                .build();
+            log.info("[NICE] siteCode={}, returnUrl={}", siteCode, returnUrl);
+            log.info("[NICE] plainData={}", sPlainData);
+
+            int iReturn = niceCheck.fnEncode(siteCode, sitePassword, sPlainData);
+            if (iReturn != 0) {
+                throw new RuntimeException("NICE 암호화 실패: " + iReturn);
+            }
+
+            String encData = niceCheck.getCipherData();
+            log.info("[NICE] encData length={}", encData.length());
+
+            // 요청번호를 Redis에 임시 저장
+            redisTemplate.opsForValue().set(REDIS_PREFIX + "req:" + requestNo, "pending", RESULT_TTL);
+
+            return NiceAuthRequestData.builder()
+                    .formUrl(NICE_FORM_URL)
+                    .siteCode(siteCode)
+                    .encData(encData)
+                    .requestNo(requestNo)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("NICE 인증 요청 생성 실패", e);
+            throw new RuntimeException("NICE 인증 요청 생성 실패: " + e.getMessage(), e);
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -74,7 +98,13 @@ public class NiceAuthService {
     // ──────────────────────────────────────────────
     public NiceAuthResult processSuccess(String encodeData) {
         try {
-            String plain = NiceSeedCrypto.decrypt(encodeData, siteCode, sitePassword);
+            CPClient niceCheck = new CPClient();
+            int iReturn = niceCheck.fnDecode(siteCode, sitePassword, encodeData);
+            if (iReturn != 0) {
+                throw new RuntimeException("NICE 복호화 실패: " + iReturn);
+            }
+
+            String plain = niceCheck.getPlainTxt();
             log.info("NICE 복호화 결과: {}", plain);
 
             Map<String, String> fields = parsePlainData(plain);
@@ -90,11 +120,9 @@ public class NiceAuthService {
                     .ci(fields.getOrDefault("CI", ""))
                     .build();
 
-            // 결과를 Redis에 저장 (프론트가 requestNo로 조회)
             if (!result.getRequestNo().isEmpty()) {
                 String key = REDIS_PREFIX + "result:" + result.getRequestNo();
-                redisTemplate.opsForValue().set(key,
-                        toJson(result), RESULT_TTL);
+                redisTemplate.opsForValue().set(key, toJson(result), RESULT_TTL);
             }
             return result;
 
@@ -111,29 +139,13 @@ public class NiceAuthService {
         String key = REDIS_PREFIX + "result:" + requestNo;
         String json = redisTemplate.opsForValue().get(key);
         if (json == null) return null;
-        redisTemplate.delete(key); // 1회용
+        redisTemplate.delete(key);
         return fromJson(json);
     }
 
     // ──────────────────────────────────────────────
     // private helpers
     // ──────────────────────────────────────────────
-    private String buildPlainData(String requestNo, String authType) {
-        return field("REQ_SEQ",     requestNo)
-             + field("SITECODE",    siteCode)
-             + field("AUTH_TYPE",   authType.isEmpty() ? "M" : authType)
-             + field("RTN_URL",     returnUrl)
-             + field("ERR_URL",     errorUrl)
-             + field("POPUP_GUBUN", "N")
-             + field("CUSTOMIZE",   "");
-    }
-
-    /** NICE 키-값 포맷: "키이름길이:키이름값길이:값" */
-    private String field(String key, String value) {
-        return key.length() + ":" + key + value.length() + ":" + value;
-    }
-
-    /** 복호화된 평문 파싱 */
     private Map<String, String> parsePlainData(String plain) {
         Map<String, String> map = new HashMap<>();
         int i = 0;
@@ -163,7 +175,6 @@ public class NiceAuthService {
     }
 
     private NiceAuthResult fromJson(String json) {
-        // 간단한 파서 (Jackson 없이)
         return NiceAuthResult.builder()
                 .success(json.contains("\"success\":true"))
                 .requestNo(extract(json, "requestNo"))
