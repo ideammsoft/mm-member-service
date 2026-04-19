@@ -86,39 +86,36 @@ public class NiceAuthController {
     // NICE 콜백 후 팝업 닫는 HTML 생성
     // ──────────────────────────────────────────────
     private String buildCompleteHtml(NiceAuthResult result) {
-        String js;
+        String data;
         if (result.isSuccess()) {
-            js = String.format(
-                "if(window.opener&&window.opener.niceAuthComplete){" +
-                "  window.opener.niceAuthComplete({" +
-                "    success:true," +
-                "    requestNo:'%s'," +
-                "    name:'%s'," +
-                "    birthDate:'%s'," +
-                "    gender:'%s'," +
-                "    mobileNo:'%s'," +
-                "    di:'%s'" +
-                "  });" +
-                "}",
+            data = String.format(
+                "{success:true,requestNo:'%s',name:'%s',birthDate:'%s',gender:'%s',mobileNo:'%s',di:'%s'}",
                 esc(result.getRequestNo()), esc(result.getName()),
                 esc(result.getBirthDate()), esc(result.getGender()),
                 esc(result.getMobileNo()), esc(result.getDi())
             );
         } else {
-            js = String.format(
-                "if(window.opener&&window.opener.niceAuthComplete){" +
-                "  window.opener.niceAuthComplete({success:false,errorMsg:'%s'});" +
-                "}",
+            data = String.format(
+                "{success:false,errorMsg:'%s'}",
                 esc(result.getErrorMsg())
             );
         }
 
+        // postMessage 방식: 크로스 오리진 안전, 부모창이 popup.close() 호출
         return "<!DOCTYPE html><html><head><meta charset='UTF-8'>" +
                "<meta http-equiv='X-UA-Compatible' content='IE=edge'>" +
                "</head><body>" +
+               "<div style='text-align:center;margin-top:80px;color:#555;font-family:sans-serif'>" +
+               "<p>인증이 완료되었습니다.</p><p style='font-size:12px'>잠시 후 자동으로 닫힙니다...</p>" +
+               "</div>" +
                "<script>" +
-               "try{" + js + "}catch(e){console.error(e);}" +
-               "window.close();" +
+               "var d=" + data + ";" +
+               "try{" +
+               "  if(window.opener){" +
+               "    window.opener.postMessage({type:'niceAuthComplete',data:d},'*');" +
+               "  }" +
+               "}catch(e){console.error(e);}" +
+               "setTimeout(function(){try{window.close();}catch(e){}},800);" +
                "</script>" +
                "</body></html>";
     }
