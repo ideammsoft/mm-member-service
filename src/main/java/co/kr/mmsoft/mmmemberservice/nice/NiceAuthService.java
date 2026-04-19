@@ -122,7 +122,18 @@ public class NiceAuthService {
             log.info("NICE fnParse keys: {}", mapResult.keySet());
             log.info("NICE fnParse 전체: {}", mapResult);
 
-            String name = mapResult.getOrDefault("UTF8_NAME", "");
+            // UTF8_NAME은 URL-인코딩된 UTF-8 문자열 (예: %EC%9D%B4...) → 디코딩 필요
+            String name = "";
+            String utf8Name = mapResult.getOrDefault("UTF8_NAME", "");
+            if (!utf8Name.isEmpty()) {
+                try {
+                    name = java.net.URLDecoder.decode(utf8Name, java.nio.charset.StandardCharsets.UTF_8.name());
+                    log.info("NICE UTF8_NAME decoded: [{}]", name);
+                } catch (Exception e) {
+                    log.warn("NICE UTF8_NAME 디코딩 실패, raw 사용: {}", e.getMessage());
+                    name = utf8Name;
+                }
+            }
             if (name.isEmpty()) name = mapResult.getOrDefault("NAME", "");
 
             NiceAuthResult result = NiceAuthResult.builder()
