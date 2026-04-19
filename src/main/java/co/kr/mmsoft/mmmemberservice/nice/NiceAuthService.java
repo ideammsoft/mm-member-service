@@ -108,11 +108,14 @@ public class NiceAuthService {
             }
 
             String plain = niceCheck.getPlainData();
-            log.info("NICE 복호화 결과: {}", plain);
+            log.info("NICE 복호화 결과 전체: [{}]", plain);
 
             // NICE 공식 샘플과 동일하게 fnParse 사용
             @SuppressWarnings("unchecked")
             java.util.HashMap<String, String> mapResult = niceCheck.fnParse(plain);
+
+            log.info("NICE fnParse keys: {}", mapResult.keySet());
+            log.info("NICE fnParse 전체: {}", mapResult);
 
             String name = mapResult.getOrDefault("UTF8_NAME", "");
             if (name.isEmpty()) name = mapResult.getOrDefault("NAME", "");
