@@ -3,12 +3,15 @@ package co.kr.mmsoft.mmmemberservice.controller;
 import co.kr.mmsoft.mmmemberservice.nice.NiceAuthRequestData;
 import co.kr.mmsoft.mmmemberservice.nice.NiceAuthResult;
 import co.kr.mmsoft.mmmemberservice.nice.NiceAuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
@@ -45,8 +48,10 @@ public class NiceAuthController {
      * - 복호화 후 Redis 저장 → 팝업 닫는 HTML 반환
      */
     @RequestMapping(value = "/success", method = {RequestMethod.POST, RequestMethod.GET}, produces = MediaType.TEXT_HTML_VALUE)
-    public String success(@RequestParam("EncodeData") String encodeData) {
-        NiceAuthResult result = niceAuthService.processSuccess(encodeData);
+    public String success(HttpServletRequest request) {
+        String encodeData = extractEncodeData(request);
+        log.info("NICE success encodeData length={}", encodeData != null ? encodeData.length() : -1);
+        NiceAuthResult result = niceAuthService.processSuccess(encodeData != null ? encodeData : "");
         log.info("NICE 인증 성공: name={}, mobile={}", result.getName(), result.getMobileNo());
         return buildCompleteHtml(result);
     }
@@ -54,6 +59,29 @@ public class NiceAuthController {
     /**
      * 3단계: NICE 실패 콜백
      */
+    /**
+     * raw query string에서 EncodeData 추출 (+를 공백으로 변환하지 않음)
+     */
+    private String extractEncodeData(HttpServletRequest request) {
+        String query = request.getQueryString(); // raw, 디코딩 없음
+        if (query != null) {
+            for (String param : query.split("&")) {
+                if (param.toLowerCase().startsWith("encodedata=")) {
+                    String raw = param.substring("EncodeData=".length());
+                    // %XX만 디코딩, + 는 그대로 유지 (Base64의 + 보존)
+                    try {
+                        return URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8);
+                    } catch (Exception e) {
+                        return raw;
+                    }
+                }
+            }
+        }
+        // POST body fallback (+ → 공백 복원)
+        String param = request.getParameter("EncodeData");
+        return param != null ? param.replace(" ", "+") : null;
+    }
+
     @RequestMapping(value = "/fail", method = {RequestMethod.POST, RequestMethod.GET}, produces = MediaType.TEXT_HTML_VALUE)
     public String fail(@RequestParam(value = "EncodeData", required = false) String encodeData) {
         log.warn("NICE 인증 실패 콜백 수신");
