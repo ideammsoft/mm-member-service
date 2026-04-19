@@ -63,30 +63,22 @@ public class NiceAuthController {
      * raw query string에서 EncodeData 추출 (+를 공백으로 변환하지 않음)
      */
     private String extractEncodeData(HttpServletRequest request) {
-        // NICE 공식 샘플(checkplus_success.jsp) 방식으로 변경
-        // request.getParameter()가 URL 디코딩을 처리 (서블릿 컨테이너 표준)
+        // Spring Cloud Gateway가 쿼리 파라미터를 이중 인코딩함:
+        //   NICE 전송: %2B → Gateway 통과: %252B → Tomcat getParameter(): %2B (1회 디코딩)
+        //   fnDecode에 %2B 전달 시 Base64 디코딩 실패(-6) → 한 번 더 디코딩 필요
         String param = request.getParameter("EncodeData");
-        log.info("NICE getParameter EncodeData length={}", param != null ? param.length() : -1);
+        log.info("NICE getParameter length={}", param != null ? param.length() : -1);
         if (param != null && param.length() > 0) {
-            log.info("NICE getParameter prefix=[{}]", param.substring(0, Math.min(80, param.length())));
-            log.info("NICE getParameter has spaces: {}, has plus: {}", param.contains(" "), param.contains("+"));
-            // NICE 샘플과 동일: getParameter 결과 그대로 사용 (+ → 공백 변환 없이)
-            return param;
-        }
-        // fallback: raw query string (+ 보존)
-        String query = request.getQueryString();
-        log.info("NICE fallback queryString: {}", query != null ? query.substring(0, Math.min(80, query.length())) : "NULL");
-        if (query != null) {
-            for (String p : query.split("&")) {
-                if (p.toLowerCase().startsWith("encodedata=")) {
-                    String raw = p.substring("encodedata=".length());
-                    log.info("NICE fallback raw prefix=[{}]", raw.substring(0, Math.min(80, raw.length())));
-                    try {
-                        return URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8);
-                    } catch (Exception e) {
-                        return raw;
-                    }
-                }
+            log.info("NICE before2ndDecode prefix=[{}]", param.substring(0, Math.min(80, param.length())));
+            try {
+                // 2차 URL 디코딩: %2B→+, %2F→/, %3D→= (Gateway 이중인코딩 복원)
+                String decoded = URLDecoder.decode(param.replace("+", "%2B"), StandardCharsets.UTF_8);
+                log.info("NICE after2ndDecode prefix=[{}]", decoded.substring(0, Math.min(80, decoded.length())));
+                log.info("NICE after2ndDecode has+: {}, len={}", decoded.contains("+"), decoded.length());
+                return decoded;
+            } catch (Exception e) {
+                log.warn("NICE 2차 디코딩 실패, getParameter 결과 그대로 사용: {}", e.getMessage());
+                return param;
             }
         }
         return null;
