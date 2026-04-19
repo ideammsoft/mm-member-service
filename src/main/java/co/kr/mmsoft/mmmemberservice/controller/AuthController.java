@@ -143,8 +143,9 @@ public class AuthController {
      ─────────────────────────────────────────────────────*/
     @PostMapping("/idcheck")
     public ResponseEntity<?> idcheck(@RequestBody IdCheckRequest idcheckRequest) {
-        log.debug("중복 확인할 openId: {}", idcheckRequest.getOpenId());
+        log.info("idcheck openId=[{}]", idcheckRequest.getOpenId());
         int result = authService.idCheck(idcheckRequest.getOpenId());
+        log.info("idcheck result={} for openId=[{}]", result, idcheckRequest.getOpenId());
         // IdCheckResponse: { "count": 결과값 } 형태의 DTO
         return ResponseEntity.ok(new IdCheckResponse(result));
     }
