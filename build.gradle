@@ -82,6 +82,9 @@ dependencies {
     // NICE 본인인증 공식 JAR (NiceID.Check.CPClient)
     implementation files('libs/NiceID_v1.2.jar')
 
+    // NICE SEED 암호화 지원: Java 21 Linux에서 JVM 기본 SEED 미포함 → BouncyCastle로 제공
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
