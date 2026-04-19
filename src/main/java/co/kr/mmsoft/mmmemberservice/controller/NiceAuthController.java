@@ -63,29 +63,33 @@ public class NiceAuthController {
      * raw query string에서 EncodeData 추출 (+를 공백으로 변환하지 않음)
      */
     private String extractEncodeData(HttpServletRequest request) {
-        String query = request.getQueryString(); // raw, 디코딩 없음
-        log.info("NICE raw queryString prefix: [{}]", query != null ? query.substring(0, Math.min(80, query.length())) : "NULL");
+        // NICE 공식 샘플(checkplus_success.jsp) 방식으로 변경
+        // request.getParameter()가 URL 디코딩을 처리 (서블릿 컨테이너 표준)
+        String param = request.getParameter("EncodeData");
+        log.info("NICE getParameter EncodeData length={}", param != null ? param.length() : -1);
+        if (param != null && param.length() > 0) {
+            log.info("NICE getParameter prefix=[{}]", param.substring(0, Math.min(80, param.length())));
+            log.info("NICE getParameter has spaces: {}, has plus: {}", param.contains(" "), param.contains("+"));
+            // NICE 샘플과 동일: getParameter 결과 그대로 사용 (+ → 공백 변환 없이)
+            return param;
+        }
+        // fallback: raw query string (+ 보존)
+        String query = request.getQueryString();
+        log.info("NICE fallback queryString: {}", query != null ? query.substring(0, Math.min(80, query.length())) : "NULL");
         if (query != null) {
-            for (String param : query.split("&")) {
-                if (param.toLowerCase().startsWith("encodedata=")) {
-                    String raw = param.substring("EncodeData=".length());
-                    log.info("NICE raw EncodeData prefix: [{}]", raw.substring(0, Math.min(80, raw.length())));
-                    log.info("NICE raw has spaces: {}, has percent: {}", raw.contains(" "), raw.contains("%"));
-                    // %XX만 디코딩, + 는 그대로 유지 (Base64의 + 보존)
+            for (String p : query.split("&")) {
+                if (p.toLowerCase().startsWith("encodedata=")) {
+                    String raw = p.substring("encodedata=".length());
+                    log.info("NICE fallback raw prefix=[{}]", raw.substring(0, Math.min(80, raw.length())));
                     try {
-                        String decoded = URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8);
-                        log.info("NICE decoded prefix: [{}]", decoded.substring(0, Math.min(80, decoded.length())));
-                        return decoded;
+                        return URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8);
                     } catch (Exception e) {
-                        log.warn("NICE URLDecoder 실패, raw 그대로 사용: {}", e.getMessage());
                         return raw;
                     }
                 }
             }
         }
-        // POST body fallback (+ → 공백 복원)
-        String param = request.getParameter("EncodeData");
-        return param != null ? param.replace(" ", "+") : null;
+        return null;
     }
 
     @RequestMapping(value = "/fail", method = {RequestMethod.POST, RequestMethod.GET}, produces = MediaType.TEXT_HTML_VALUE)

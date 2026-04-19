@@ -101,6 +101,11 @@ public class NiceAuthService {
             // Base64에서 + 가 URL 디코딩 시 공백으로 변환되는 경우 복원
             encodeData = encodeData.replace(" ", "+");
 
+            log.info("[NICE] processSuccess siteCode={}, pwLen={}, dataLen={}",
+                    siteCode, sitePassword != null ? sitePassword.length() : -1, encodeData.length());
+            log.info("[NICE] processSuccess encodeData prefix=[{}]", encodeData.substring(0, Math.min(40, encodeData.length())));
+            log.info("[NICE] JCE providers: {}", java.util.Arrays.stream(java.security.Security.getProviders()).map(p -> p.getName()).collect(java.util.stream.Collectors.joining(",")));
+
             CPClient niceCheck = new CPClient();
             int iReturn = niceCheck.fnDecode(siteCode, sitePassword, encodeData);
             if (iReturn != 0) {
