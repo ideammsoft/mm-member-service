@@ -98,6 +98,9 @@ public class NiceAuthService {
     // ──────────────────────────────────────────────
     public NiceAuthResult processSuccess(String encodeData) {
         try {
+            // Base64에서 + 가 URL 디코딩 시 공백으로 변환되는 경우 복원
+            encodeData = encodeData.replace(" ", "+");
+
             CPClient niceCheck = new CPClient();
             int iReturn = niceCheck.fnDecode(siteCode, sitePassword, encodeData);
             if (iReturn != 0) {
@@ -107,17 +110,22 @@ public class NiceAuthService {
             String plain = niceCheck.getPlainData();
             log.info("NICE 복호화 결과: {}", plain);
 
-            Map<String, String> fields = parsePlainData(plain);
+            // NICE 공식 샘플과 동일하게 fnParse 사용
+            @SuppressWarnings("unchecked")
+            java.util.HashMap<String, String> mapResult = niceCheck.fnParse(plain);
+
+            String name = mapResult.getOrDefault("UTF8_NAME", "");
+            if (name.isEmpty()) name = mapResult.getOrDefault("NAME", "");
 
             NiceAuthResult result = NiceAuthResult.builder()
                     .success(true)
-                    .requestNo(fields.getOrDefault("REQ_SEQ", ""))
-                    .name(fields.getOrDefault("UTF8_NAME", fields.getOrDefault("NAME", "")))
-                    .birthDate(fields.getOrDefault("BIRTHDATE", ""))
-                    .gender(fields.getOrDefault("GENDER", ""))
-                    .mobileNo(fields.getOrDefault("MOBILE_NO", ""))
-                    .di(fields.getOrDefault("DI", ""))
-                    .ci(fields.getOrDefault("CI", ""))
+                    .requestNo(mapResult.getOrDefault("REQ_SEQ", ""))
+                    .name(name)
+                    .birthDate(mapResult.getOrDefault("BIRTHDATE", ""))
+                    .gender(mapResult.getOrDefault("GENDER", ""))
+                    .mobileNo(mapResult.getOrDefault("MOBILE_NO", ""))
+                    .di(mapResult.getOrDefault("DI", ""))
+                    .ci(mapResult.getOrDefault("CI", ""))
                     .build();
 
             if (!result.getRequestNo().isEmpty()) {
