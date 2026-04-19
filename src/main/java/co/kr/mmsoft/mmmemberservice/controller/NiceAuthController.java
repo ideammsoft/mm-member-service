@@ -117,12 +117,10 @@ public class NiceAuthController {
                "<meta http-equiv='X-UA-Compatible' content='IE=edge'>" +
                "</head><body>" +
                "<script>" +
-               "function init(){" +
-               "  try{" + js + "}catch(e){console.error(e);}" +
-               "  window.close();" +
-               "}" +
+               "try{" + js + "}catch(e){console.error(e);}" +
+               "window.close();" +
                "</script>" +
-               "<body onload='init();'></body></html>";
+               "</body></html>";
     }
 
     private String esc(String s) { return s == null ? "" : s.replace("'", "\\'"); }
