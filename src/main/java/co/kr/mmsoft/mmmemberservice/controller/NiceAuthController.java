@@ -64,14 +64,20 @@ public class NiceAuthController {
      */
     private String extractEncodeData(HttpServletRequest request) {
         String query = request.getQueryString(); // raw, 디코딩 없음
+        log.info("NICE raw queryString prefix: [{}]", query != null ? query.substring(0, Math.min(80, query.length())) : "NULL");
         if (query != null) {
             for (String param : query.split("&")) {
                 if (param.toLowerCase().startsWith("encodedata=")) {
                     String raw = param.substring("EncodeData=".length());
+                    log.info("NICE raw EncodeData prefix: [{}]", raw.substring(0, Math.min(80, raw.length())));
+                    log.info("NICE raw has spaces: {}, has percent: {}", raw.contains(" "), raw.contains("%"));
                     // %XX만 디코딩, + 는 그대로 유지 (Base64의 + 보존)
                     try {
-                        return URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8);
+                        String decoded = URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8);
+                        log.info("NICE decoded prefix: [{}]", decoded.substring(0, Math.min(80, decoded.length())));
+                        return decoded;
                     } catch (Exception e) {
+                        log.warn("NICE URLDecoder 실패, raw 그대로 사용: {}", e.getMessage());
                         return raw;
                     }
                 }
