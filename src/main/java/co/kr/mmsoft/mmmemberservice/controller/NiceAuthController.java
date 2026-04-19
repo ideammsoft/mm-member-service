@@ -44,7 +44,7 @@ public class NiceAuthController {
      * - EncodeData: 암호화된 인증 결과
      * - 복호화 후 Redis 저장 → 팝업 닫는 HTML 반환
      */
-    @PostMapping(value = "/success", produces = MediaType.TEXT_HTML_VALUE)
+    @RequestMapping(value = "/success", method = {RequestMethod.POST, RequestMethod.GET}, produces = MediaType.TEXT_HTML_VALUE)
     public String success(@RequestParam("EncodeData") String encodeData) {
         NiceAuthResult result = niceAuthService.processSuccess(encodeData);
         log.info("NICE 인증 성공: name={}, mobile={}", result.getName(), result.getMobileNo());
@@ -54,7 +54,7 @@ public class NiceAuthController {
     /**
      * 3단계: NICE 실패 콜백
      */
-    @PostMapping(value = "/fail", produces = MediaType.TEXT_HTML_VALUE)
+    @RequestMapping(value = "/fail", method = {RequestMethod.POST, RequestMethod.GET}, produces = MediaType.TEXT_HTML_VALUE)
     public String fail(@RequestParam(value = "EncodeData", required = false) String encodeData) {
         log.warn("NICE 인증 실패 콜백 수신");
         NiceAuthResult result = NiceAuthResult.builder()
