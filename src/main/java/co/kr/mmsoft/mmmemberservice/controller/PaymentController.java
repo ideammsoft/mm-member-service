@@ -10,27 +10,36 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
- * 엠엠소프트 KSPay 결제 콜백 처리
+ * 엠엠소프트 KSPay V1.4 결제 콜백 처리
  *
- * POST /api/payment/kspayrec  ← nginx가 /manyman/KSPayRcv.asp 를 프록시
- *   - KSPay 팝업 창에서 결제 완료 후 호출
- *   - 결과 파라미터를 부모 창(authfrm.html)의 paramSet() → goResult() 로 전달하는 HTML 응답
+ * V1.4 흐름:
+ *   index.html → _pay() → KSNET iframe → POST sndReply
+ *   POST /api/payment/kspayrec  ← nginx /manyman/KSPayRcv.asp
+ *     → window.parent.postMessage(KSPAY_RCV) → index.html → form submit
+ *   POST /api/payment/kspayresult  ← nginx /manyman/KSPayResult.asp
+ *     → KSNET WebHost 검증 → DB 처리 → window.opener.postMessage(KSPAY_RESULT)
  *
- * POST /api/payment/result  ← nginx가 /manyman/result.asp 를 프록시
- *   - authfrm.html의 KSPayWeb form이 submit 한 결과 수신
- *   - 결제 성공 시 MSSQL (manyman.payment 증가, M_sms INSERT, SMS 발송)
- *   - 성공/실패 HTML 페이지 반환
- *
- * ※ JWT 인증 없이 호출됨 (PC 앱이 직접 열기, KSPay 팝업 콜백)
- *    → JwtFilter.PUBLIC_PREFIX 에 "/api/payment/" 추가 필요
+ * ※ JWT 인증 없이 호출됨 → JwtFilter.PUBLIC_PREFIX 에 "/api/payment/" 필요
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/payment")
 public class PaymentController {
+
+    private static final String KSNET_WEBHOST_URL =
+            "http://kspay.ksnet.to/store/KSPayWebV1.4/web_host/recv_post.jsp";
+    private static final String KSNET_RPARAMS =
+            "authyn`trno`trddt`trdtm`amt`authno`msg1`msg2`ordno`isscd`aqucd`result`resultcd";
 
     private final Optional<PaymentService> paymentService;
 
@@ -40,99 +49,138 @@ public class PaymentController {
     }
 
     // -----------------------------------------------------------------------
-    // KSPayRcv.asp 대체: KSPay 결제 완료 → 직접 DB 처리 → 팝업에 결과 HTML 반환
-    // sndReply URL 에 ?id=userId 포함하여 호출됨
+    // V1.4: KSPayRcv.asp 대체
+    //   KSNET iframe → POST reCommConId/reCommType/reHash/reCnclType
+    //   → window.parent.postMessage(KSPAY_RCV) → index.html
     // -----------------------------------------------------------------------
     @PostMapping(value = "/kspayrec", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> kspayrec(HttpServletRequest req) {
 
-        // sndReply URL 쿼리 파라미터에서 사용자 ID 추출
+        String rcid = param(req, "reCommConId");
+
+        if (!rcid.isEmpty()) {
+            // ── V1.4 흐름 ──
+            String rctype   = param(req, "reCommType");
+            String rhash    = param(req, "reHash");
+            String cnclType = param(req, "reCnclType");
+            boolean cancel  = "1".equals(cnclType);
+            log.info("KSPayRcv V1.4 - rcid={}, cancel={}", rcid, cancel);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(buildKsPayRcvV14(cancel, rcid, rctype, rhash));
+        }
+
+        // ── V1.3 레거시 흐름 ──
         String id = req.getParameter("id");
         if (id == null) id = "";
 
-        // KSPay 전문 유형별 결과 파라미터 파싱 (원본 KSPayRcv.asp 로직 동일)
         String approvalType = param(req, "reApprovalType");
         String authyn, amt, msg1, msg2, ordno;
-
         char type = approvalType.isEmpty() ? '0' : approvalType.charAt(0);
 
-        if (type == '1' || type == 'I') {        // 신용카드 (MPI / ISP)
-            authyn = param(req, "reStatus");
-            amt    = param(req, "reAmount");
-            msg1   = param(req, "reMessage1");
-            msg2   = param(req, "reMessage2");
+        if (type == '1' || type == 'I') {
+            authyn = param(req, "reStatus");  amt = param(req, "reAmount");
+            msg1   = param(req, "reMessage1"); msg2 = param(req, "reMessage2");
             ordno  = param(req, "reOrderNumber");
-        } else if (type == '4') {                // 포인트
-            authyn = param(req, "rePStatus");
-            amt    = param(req, "reAmount");
-            msg1   = param(req, "rePMessage1");
-            msg2   = param(req, "rePMessage2");
+        } else if (type == '4') {
+            authyn = param(req, "rePStatus"); amt = param(req, "reAmount");
+            msg1   = param(req, "rePMessage1"); msg2 = param(req, "rePMessage2");
             ordno  = param(req, "reOrderNumber");
-        } else if (type == '6' || type == '2') { // 가상계좌 / 계좌이체
-            authyn = param(req, "reVAStatus");
-            amt    = param(req, "reAmount");
-            msg1   = param(req, "reVAMessage1");
-            msg2   = param(req, "reVAMessage2");
-            ordno  = param(req, "reOrderNumber");
-        } else if (type == '7') {               // 월드패스
-            authyn = param(req, "reWPStatus");
-            amt    = param(req, "reAmount");
-            msg1   = param(req, "reWPMessage1");
-            msg2   = param(req, "reWPMessage2");
+        } else if (type == '6' || type == '2') {
+            authyn = param(req, "reVAStatus"); amt = param(req, "reAmount");
+            msg1   = param(req, "reVAMessage1"); msg2 = param(req, "reVAMessage2");
             ordno  = param(req, "reOrderNumber");
         } else {
             authyn = ""; amt = ""; msg1 = ""; msg2 = ""; ordno = "";
         }
 
-        log.info("KSPayRcv - authyn={}, amt={}, ordno={}, id={}", authyn, amt, ordno, id);
-
+        log.info("KSPayRcv V1.3 - authyn={}, amt={}, ordno={}, id={}", authyn, amt, ordno, id);
         boolean success = "O".equalsIgnoreCase(authyn);
         String formatted = "";
-
         if (success) {
             try {
                 int price = Integer.parseInt(amt);
-                try {
-                    formatted = String.format("%,d", price);
-                } catch (Exception ignored) {}
+                formatted = String.format("%,d", price);
                 String finalId = id;
                 paymentService.ifPresentOrElse(
                         svc -> svc.processPaymentSuccess(finalId, price),
-                        ()  -> log.warn("PaymentService 미설정 - mssql-manyman 설정을 확인하세요")
-                );
-            } catch (NumberFormatException e) {
-                log.error("결제금액 파싱 오류 - amt={}", amt);
-                success = false;
+                        ()  -> log.warn("PaymentService 미설정"));
             } catch (Exception e) {
-                log.error("결제 DB 처리 중 오류 - id={}", id, e);
+                log.error("V1.3 결제 처리 오류", e);
                 success = false;
             }
-        } else {
-            log.warn("결제 실패 응답 - authyn={}, msg={}", authyn, msg1);
         }
-
         String msg = msg1 + (msg2.isEmpty() ? "" : " " + msg2);
-
-        // 팝업 내부 프레임에서 실행: 부모창(authfrm.html)에 결과 통보 후 팝업 닫기
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
-                .body(buildKsPayRcvJs(success, formatted, msg));
+                .body(buildKsPayRcvV13(success, formatted, msg));
     }
 
     // -----------------------------------------------------------------------
-    // result.asp 대체: KSPayWeb form submit → MSSQL 저장 → 결과 HTML
+    // V1.4: KSPayResult.asp 대체
+    //   index.html form submit → reCommConId/reCommType/reHash/sndAmount/a/b
+    //   → KSNET WebHost 검증 → DB 처리 → window.opener.postMessage(KSPAY_RESULT)
+    // -----------------------------------------------------------------------
+    @PostMapping(value = "/kspayresult", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> kspayresult(HttpServletRequest req) {
+
+        String rcid    = param(req, "reCommConId");
+        String amount  = param(req, "sndAmount");
+        String uid     = param(req, "a");
+        String pamount = param(req, "b");
+
+        log.info("KSPayResult - rcid={}, amount={}, uid={}", rcid, amount, uid);
+
+        String authyn = "X", amt = "", msg1 = "";
+
+        try {
+            Map<String, String> ksnet = callKsnetWebHost(rcid, amount);
+            authyn = ksnet.getOrDefault("authyn", "X");
+            amt    = ksnet.getOrDefault("amt",    "");
+            msg1   = ksnet.getOrDefault("msg1",   "");
+            log.info("KSNET 검증 결과 - authyn={}, amt={}, msg={}", authyn, amt, msg1);
+        } catch (Exception e) {
+            log.error("KSNET WebHost 호출 실패", e);
+            msg1 = "결제 검증 오류";
+        }
+
+        boolean success = "O".equalsIgnoreCase(authyn);
+
+        if (success && !uid.isEmpty() && !pamount.isEmpty()) {
+            try {
+                int price = Integer.parseInt(pamount);
+                paymentService.ifPresentOrElse(
+                        svc -> svc.processPaymentSuccess(uid, price),
+                        ()  -> log.warn("PaymentService 미설정 - mssql-manyman 설정을 확인하세요"));
+            } catch (NumberFormatException e) {
+                log.error("결제금액 파싱 오류 - pamount={}", pamount);
+                success = false;
+                msg1 = "결제금액 오류";
+            } catch (Exception e) {
+                log.error("결제 DB 처리 오류 - uid={}", uid, e);
+                success = false;
+                msg1 = "DB 처리 오류";
+            }
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .body(buildKspayResult(success, amt, msg1));
+    }
+
+    // -----------------------------------------------------------------------
+    // V1.3 result.asp 대체 (레거시)
     // -----------------------------------------------------------------------
     @PostMapping(value = "/result", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> result(HttpServletRequest req) {
 
-        String authyn = param(req, "reAuthyn");
-        String id     = param(req, "a");      // 사용자 아이디
-        String priceStr = param(req, "b");    // 충전 금액
-        String msg1   = param(req, "reMsg1");
-        String trno   = param(req, "reTrno");
+        String authyn   = param(req, "reAuthyn");
+        String id       = param(req, "a");
+        String priceStr = param(req, "b");
+        String msg1     = param(req, "reMsg1");
+        String trno     = param(req, "reTrno");
 
-        log.info("결제 결과 수신 - authyn={}, id={}, price={}, trno={}", authyn, id, priceStr, trno);
-
+        log.info("결제 결과(V1.3) - authyn={}, id={}, price={}, trno={}", authyn, id, priceStr, trno);
         boolean success = "O".equalsIgnoreCase(authyn);
 
         if (success) {
@@ -140,57 +188,154 @@ public class PaymentController {
                 int price = Integer.parseInt(priceStr);
                 paymentService.ifPresentOrElse(
                         svc -> svc.processPaymentSuccess(id, price),
-                        ()  -> log.warn("PaymentService 미설정 - mssql-manyman 설정을 확인하세요")
-                );
-            } catch (NumberFormatException e) {
-                log.error("결제금액 파싱 오류 - priceStr={}", priceStr);
-                success = false;
+                        ()  -> log.warn("PaymentService 미설정"));
             } catch (Exception e) {
-                log.error("결제 DB 처리 중 오류 - id={}", id, e);
+                log.error("V1.3 result 처리 오류", e);
                 success = false;
             }
-        } else {
-            log.warn("결제 실패 응답 - authyn={}, msg={}", authyn, msg1);
         }
-
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
                 .body(buildResultHtml(success, id, priceStr, msg1));
     }
 
     // -----------------------------------------------------------------------
-    // 헬퍼
+    // KSNET WebHost API 호출 (V1.4 서버 검증)
     // -----------------------------------------------------------------------
+    private Map<String, String> callKsnetWebHost(String rcid, String amount) throws Exception {
+        String query = "sndCommConId=" + URLEncoder.encode(rcid, "UTF-8")
+                + "&sndActionType=1"
+                + "&sndAmount=" + URLEncoder.encode(amount, "UTF-8")
+                + "&sndRpyParams=" + URLEncoder.encode(KSNET_RPARAMS, "UTF-8");
+
+        URL url = new URL(KSNET_WEBHOST_URL + "?" + query);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(15_000);
+        conn.setReadTimeout(15_000);
+
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(), "EUC-KR"))) {
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+        }
+
+        String response = sb.toString();
+        log.debug("KSNET WebHost 응답: {}", response);
+
+        String[] parts = response.split("`", -1);
+        String[] keys  = KSNET_RPARAMS.split("`");
+        Map<String, String> result = new HashMap<>();
+        // parts[0] = 응답유형 구분자, parts[1..] = 값
+        if (parts.length > keys.length) {
+            for (int i = 0; i < keys.length; i++) {
+                result.put(keys[i], parts[i + 1]);
+            }
+        }
+        return result;
+    }
+
+    // -----------------------------------------------------------------------
+    // HTML 빌더
+    // -----------------------------------------------------------------------
+
+    /** V1.4 KSPayRcv: KSNET iframe → window.parent.postMessage(KSPAY_RCV) → index.html */
+    private String buildKsPayRcvV14(boolean cancel, String rcid, String rctype, String rhash) {
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body>"
+                + "<script>"
+                + "(function(){"
+                + "window.parent.postMessage({"
+                + "type:'KSPAY_RCV',"
+                + "cancel:" + cancel + ","
+                + "rcid:"   + esc(rcid)   + ","
+                + "rctype:" + esc(rctype) + ","
+                + "rhash:"  + esc(rhash)
+                + "},'*');"
+                + "})();"
+                + "</script>"
+                + "</body></html>";
+    }
+
+    /** V1.4 KSPayResult: window.opener(PaymentPage.jsx)에 결과 postMessage */
+    private String buildKspayResult(boolean success, String amt, String msg) {
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+                + "<style>body{font-family:'맑은 고딕',sans-serif;background:#eef2f7;"
+                + "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
+                + ".box{text-align:center;color:#555;font-size:15px}"
+                + ".icon{font-size:40px;margin-bottom:12px}</style>"
+                + "</head><body>"
+                + "<div class=\"box\"><div class=\"icon\" id=\"ico\">⏳</div>"
+                + "<p id=\"txt\">결제 결과를 처리하고 있습니다...</p></div>"
+                + "<script>"
+                + "(function(){"
+                + "var ok=" + success + ";"
+                + "var amt=" + esc(amt) + ";"
+                + "var msg=" + esc(msg) + ";"
+                + "if(window.opener&&!window.opener.closed){"
+                + "window.opener.postMessage({type:'KSPAY_RESULT',ok:ok,amt:amt,msg:msg},'*');"
+                + "setTimeout(function(){window.close();},1200);"
+                + "}else{"
+                + "document.getElementById('ico').textContent=ok?'✅':'❌';"
+                + "document.getElementById('txt').innerHTML=ok"
+                + "?'결제가 완료되었습니다.<br>'+amt+'원이 처리되었습니다.'"
+                + ":'결제가 완료되지 않았습니다.<br>'+(msg||'');"
+                + "}"
+                + "})();"
+                + "</script></body></html>";
+    }
+
+    /** V1.3 KSPayRcv: top.opener.paymentResult() 레거시 */
+    private String buildKsPayRcvV13(boolean success, String formatted, String msg) {
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+                + "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"><script>"
+                + "function init(){"
+                + "try{if(top.opener&&top.opener.paymentResult){"
+                + "top.opener.paymentResult(" + success + "," + esc(formatted) + "," + esc(msg) + ");"
+                + "}}catch(e){}"
+                + "window.close();}"
+                + "</script></head>"
+                + "<body onload=\"init();\"></body></html>";
+    }
+
+    /** V1.3 result.asp: 결과 HTML 페이지 */
+    private String buildResultHtml(boolean success, String id, String price, String msg) {
+        String color   = success ? "#1a73e8" : "#e53e3e";
+        String bgColor = success ? "#e8f0fe" : "#fff5f5";
+        String title   = success ? "결제가 완료되었습니다" : "결제가 완료되지 않았습니다";
+        String formatted = "";
+        if (price != null && !price.isEmpty()) {
+            try { formatted = String.format("%,d원", Integer.parseInt(price)); }
+            catch (NumberFormatException ignored) {}
+        }
+        String detail = success
+                ? (formatted.isEmpty() ? "" : formatted + " 충전이 정상 처리되었습니다.<br>") + "프로그램을 다시 시작해 주세요."
+                : (msg == null || msg.isEmpty() ? "결제가 취소되었거나 오류가 발생했습니다." : msg) + "<br>창을 닫고 다시 시도해 주세요.";
+        return "<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\">"
+                + "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
+                + "<title>" + (success ? "결제 완료" : "결제 실패") + "</title>"
+                + "<style>body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:"
+                + bgColor + ";margin:0;padding:30px 20px;text-align:center;}"
+                + ".box{background:#fff;border:2px solid " + color + ";border-radius:8px;"
+                + "padding:30px 24px;max-width:380px;margin:0 auto;}"
+                + ".ttl{font-size:16px;font-weight:bold;color:" + color + ";margin-bottom:14px;}"
+                + ".msg{font-size:13px;color:#555;line-height:1.8;margin-bottom:20px;}"
+                + ".btn{padding:8px 24px;background:" + color + ";color:#fff;border:none;"
+                + "border-radius:4px;font-size:13px;font-weight:bold;cursor:pointer;}"
+                + ".cnt{font-size:11px;color:#999;margin-top:10px;}</style></head><body>"
+                + "<div class=\"box\"><div class=\"ttl\">" + title + "</div>"
+                + "<div class=\"msg\">" + detail + "</div>"
+                + "<button class=\"btn\" onclick=\"window.close()\">닫기</button>"
+                + "<div class=\"cnt\" id=\"cnt\"></div></div>"
+                + "<script>var s=5;function tick(){if(s<=0){window.close();return;}"
+                + "document.getElementById('cnt').innerHTML=s+'초 후 자동으로 닫힙니다';s--;setTimeout(tick,1000);}"
+                + "tick();</script></body></html>";
+    }
 
     /** request.getParameter null-safe */
     private String param(HttpServletRequest req, String name) {
         String v = req.getParameter(name);
         return v == null ? "" : v.trim();
-    }
-
-    /**
-     * KSPay 팝업 내부 프레임에서 실행되는 JS:
-     *   1) top.opener.paymentResult() → authfrm.html에 결과 통보
-     *   2) window.close() → 팝업 전체 닫기 (IE: iframe에서 호출 시 top window 닫힘)
-     */
-    private String buildKsPayRcvJs(boolean success, String formatted, String msg) {
-        String okStr  = success ? "true" : "false";
-        String amtEsc = esc(formatted);
-        String msgEsc = esc(msg);
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
-                + "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
-                + "<script>"
-                + "function init(){"
-                + "try{"
-                + "if(top.opener&&top.opener.paymentResult){"
-                + "top.opener.paymentResult(" + okStr + "," + amtEsc + "," + msgEsc + ");"
-                + "}"
-                + "}catch(e){}"
-                + "window.close();"
-                + "}"
-                + "</script>"
-                + "</head>"
-                + "<body onload=\"init();\"></body></html>";
     }
 
     /** JS 문자열 이스케이프 + 따옴표 감싸기 */
@@ -202,50 +347,5 @@ public class PaymentController {
              .replace("\r", "")
              .replace("\n", "");
         return "\"" + s + "\"";
-    }
-
-    /** 결제 결과 HTML 페이지 (IE 호환) */
-    private String buildResultHtml(boolean success, String id, String price, String msg) {
-        String color     = success ? "#1a73e8" : "#e53e3e";
-        String bgColor   = success ? "#e8f0fe" : "#fff5f5";
-        String title     = success ? "결제가 완료되었습니다" : "결제가 완료되지 않았습니다";
-        String formatted = "";
-        if (price != null && !price.isEmpty()) {
-            try {
-                formatted = String.format("%,d원", Integer.parseInt(price));
-            } catch (NumberFormatException ignored) {}
-        }
-        String detail = success
-                ? (formatted.isEmpty() ? "" : formatted + " 충전이 정상 처리되었습니다.<br>")
-                  + "프로그램을 다시 시작해 주세요."
-                : (msg == null || msg.isEmpty() ? "결제가 취소되었거나 오류가 발생했습니다." : msg)
-                  + "<br>창을 닫고 다시 시도해 주세요.";
-
-        return "<!DOCTYPE html><html lang=\"ko\"><head>"
-                + "<meta charset=\"UTF-8\">"
-                + "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
-                + "<title>" + (success ? "결제 완료" : "결제 실패") + "</title>"
-                + "<style>"
-                + "body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:" + bgColor + ";margin:0;padding:30px 20px;text-align:center;}"
-                + ".box{background:#fff;border:2px solid " + color + ";border-radius:8px;padding:30px 24px;max-width:380px;margin:0 auto;}"
-                + ".ttl{font-size:16px;font-weight:bold;color:" + color + ";margin-bottom:14px;}"
-                + ".msg{font-size:13px;color:#555;line-height:1.8;margin-bottom:20px;}"
-                + ".btn{padding:8px 24px;background:" + color + ";color:#fff;border:none;border-radius:4px;font-size:13px;"
-                + "font-family:'맑은 고딕','Malgun Gothic',sans-serif;font-weight:bold;cursor:pointer;}"
-                + ".cnt{font-size:11px;color:#999;margin-top:10px;}"
-                + "</style></head><body>"
-                + "<div class=\"box\">"
-                + "<div class=\"ttl\">" + title + "</div>"
-                + "<div class=\"msg\">" + detail + "</div>"
-                + "<button class=\"btn\" onclick=\"window.close()\">닫기</button>"
-                + "<div class=\"cnt\" id=\"cnt\"></div>"
-                + "</div>"
-                + "<script>"
-                + "var s=5;"
-                + "function tick(){if(s<=0){window.close();return;}"
-                + "document.getElementById('cnt').innerHTML=s+'초 후 자동으로 닫힙니다';s--;setTimeout(tick,1000);}"
-                + "tick();"
-                + "</script>"
-                + "</body></html>";
     }
 }
