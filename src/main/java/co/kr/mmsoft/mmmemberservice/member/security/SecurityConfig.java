@@ -199,6 +199,9 @@ public class SecurityConfig {
                 // /images/pds/** : 제품소개 썸네일 이미지 → 누구나 접근 가능
                 .requestMatchers("/images/pds/**").permitAll()
 
+                // /api/payment/** : KSPay 결제 콜백 (KSNET 서버 → 인증 없이 호출됨)
+                .requestMatchers("/api/payment/**").permitAll()
+
                 // 그 외 모든 경로 → 로그인(인증) 필요
                 .anyRequest().authenticated()
         );
