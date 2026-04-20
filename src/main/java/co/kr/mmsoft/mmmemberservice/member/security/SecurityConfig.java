@@ -225,6 +225,13 @@ public class SecurityConfig {
                 .successHandler(oAuth2LoginSuccessHandler)
         );
 
+        // 인증 실패 시 OAuth2 redirect 대신 401 반환 (REST API용)
+        // KSPay 콜백 등 비브라우저 클라이언트가 redirect를 따라가지 않도록 방지
+        http.exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, authEx) ->
+                        res.sendError(401, "Unauthorized"))
+        );
+
         // JWT 인증 필터 등록
         // UsernamePasswordAuthenticationFilter 앞에 실행되도록 등록합니다
         // 모든 요청이 컨트롤러에 도달하기 전에 JWT 검증을 먼저 수행합니다
