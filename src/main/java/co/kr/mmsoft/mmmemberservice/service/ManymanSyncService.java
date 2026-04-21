@@ -263,4 +263,30 @@ public class ManymanSyncService {
             log.info("manyman INSERT 완료(OAuth) - id: {}, 행수: {}", id, rows);
         }
     }
+
+    /**
+     * 비밀번호 변경 시 manyman.password AES 암호화 업데이트
+     *
+     * @param openId      manyman.id (일반 로그인) 또는 email (OAuth)
+     * @param rawPassword 새 평문 비밀번호
+     */
+    public void syncPasswordToManyman(String openId, String rawPassword) {
+        if (openId == null || openId.isBlank() || rawPassword == null || rawPassword.isBlank()) return;
+        String sql = """
+                UPDATE manyman SET
+                    password = dbo.AES_Encript(?, ?),
+                    editdate = CONVERT(NVARCHAR(10), GETDATE(), 23)
+                WHERE id = ?
+                """;
+        try (Connection conn = mssqlDataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, rawPassword);
+            ps.setString(2, AES_KEY);
+            ps.setString(3, openId);
+            int rows = ps.executeUpdate();
+            log.info("manyman 비밀번호 동기화 완료 - id: {}, 행수: {}", openId, rows);
+        } catch (Exception e) {
+            log.warn("manyman 비밀번호 동기화 실패 - openId: {}, 오류: {}", openId, e.getMessage());
+        }
+    }
 }

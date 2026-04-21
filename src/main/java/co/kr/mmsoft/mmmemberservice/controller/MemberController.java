@@ -86,6 +86,10 @@ public class MemberController {
 
         accountMapper.updatePasswordByAccountId(accountId, passwordEncoder.encode(newPassword));
         log.debug("비밀번호 변경 - accountId: {}", accountId);
+
+        // MSSQL manyman 비밀번호 동기화 (AES 암호화)
+        manymanSyncService.ifPresent(svc -> svc.syncPasswordToManyman(account.getOpenId(), newPassword));
+
         return ResponseEntity.ok(Map.of("msg", "ok"));
     }
 
