@@ -22,7 +22,7 @@ public class EmailService {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom("ideakslee@gmail.com");
-            message.setTo("ideakslee@gmail.com");
+            message.setTo("man@mmsoft.co.kr");
             message.setSubject("[MM기사모집] 문의 접수 - " + type);
             message.setText(
                 "광고 페이지 문의가 접수되었습니다.\n\n" +
