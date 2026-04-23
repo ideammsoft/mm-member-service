@@ -40,7 +40,7 @@
     </select>
 
     <update id="incrementDownloadCount">
-        UPDATE pds SET download_count = download_count + 1 WHERE pds_id = #{pdsId}
+        UPDATE pds SET download_count = COALESCE(download_count, 0) + 1 WHERE pds_id = #{pdsId}
     </update>
 
 </mapper>
