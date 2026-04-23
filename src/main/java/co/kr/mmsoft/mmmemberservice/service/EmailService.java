@@ -18,6 +18,28 @@ public class EmailService {
      * @param to        수신자 이메일
      * @param tempPassword 임시 비밀번호 (평문)
      */
+    public void sendContactInquiry(String type, String name, String region, String phone) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("ideakslee@gmail.com");
+            message.setTo("ideakslee@gmail.com");
+            message.setSubject("[MM기사모집] 문의 접수 - " + type);
+            message.setText(
+                "광고 페이지 문의가 접수되었습니다.\n\n" +
+                "구분: " + type + "\n" +
+                "성명: " + name + "\n" +
+                "지역: " + region + "\n" +
+                "연락처: " + phone + "\n\n" +
+                "담당자 확인 후 연락해 주세요."
+            );
+            mailSender.send(message);
+            log.debug("문의 이메일 발송 완료 - type: {}, name: {}", type, name);
+        } catch (Exception e) {
+            log.error("문의 이메일 발송 실패 - error: {}", e.getMessage());
+            throw new RuntimeException("이메일 발송에 실패했습니다.");
+        }
+    }
+
     public void sendTempPassword(String to, String tempPassword) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();

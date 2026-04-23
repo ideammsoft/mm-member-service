@@ -292,4 +292,22 @@ public class AuthController {
                 provider
         ));
     }
+
+    /** 광고 페이지 문의 폼 메일 발송 (POST /api/auth/contact) */
+    @PostMapping("/contact")
+    public ResponseEntity<?> contact(@RequestBody Map<String, String> body) {
+        try {
+            String type   = body.getOrDefault("type",   "");
+            String name   = body.getOrDefault("name",   "");
+            String region = body.getOrDefault("region", "");
+            String phone  = body.getOrDefault("phone",  "");
+            if (name.isBlank() || phone.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "성명과 연락처는 필수입니다."));
+            }
+            emailService.sendContactInquiry(type, name, region, phone);
+            return ResponseEntity.ok(Map.of("msg", "ok"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "발송 실패: " + e.getMessage()));
+        }
+    }
 }
