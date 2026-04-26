@@ -89,6 +89,29 @@ public class PaymentService {
         }
     }
 
+    /**
+     * API 카드충전 처리: M_sms "카드충전-API" 기록만, manyman.payment 미업데이트
+     * noim_sms_balance 충전은 PaymentPage.jsx → mm-admin-service card-charge 엔드포인트에서 처리
+     */
+    public void recordApiCharge(String id, int price) {
+        if (id == null || id.isBlank() || price <= 0) {
+            log.warn("API 카드충전 스킵 - id={}, price={}", id, price);
+            return;
+        }
+        try (Connection conn = manymanDs.getConnection()) {
+            String sql = "INSERT INTO M_sms (id, title, payment) VALUES (?, '카드충전-API', ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, id);
+                ps.setInt(2, price);
+                ps.executeUpdate();
+                log.info("M_sms API 카드충전 이력 등록 - id={}, price={}", id, price);
+            }
+        } catch (Exception e) {
+            log.error("API 카드충전 DB 처리 실패 - id={}, price={}", id, price, e.getMessage(), e);
+            throw new RuntimeException("API 카드충전 DB 처리 실패", e);
+        }
+    }
+
     /** manyman.mphone 조회 */
     private String getMphone(Connection conn, String id) throws Exception {
         String sql = "SELECT mphone FROM manyman WHERE id = ?";

@@ -128,8 +128,12 @@ public class PaymentController {
         String amount  = param(req, "sndAmount");
         String uid     = param(req, "a");
         String pamount = param(req, "b");
+        // apiflg: URL QueryString(?apiflg=Y) 또는 form field d 에서 읽음
+        String apiFlg  = param(req, "apiflg");
+        if (apiFlg.isEmpty()) apiFlg = param(req, "d");
+        boolean isApi  = "Y".equalsIgnoreCase(apiFlg);
 
-        log.info("KSPayResult - rcid={}, amount={}, uid={}", rcid, amount, uid);
+        log.info("KSPayResult - rcid={}, amount={}, uid={}, isApi={}", rcid, amount, uid, isApi);
 
         String authyn = "X", amt = "", msg1 = "";
 
@@ -149,9 +153,17 @@ public class PaymentController {
         if (success && !uid.isEmpty() && !pamount.isEmpty()) {
             try {
                 int price = Integer.parseInt(pamount);
-                paymentService.ifPresentOrElse(
-                        svc -> svc.processPaymentSuccess(uid, price),
-                        ()  -> log.warn("PaymentService 미설정 - mssql-manyman 설정을 확인하세요"));
+                if (isApi) {
+                    // API 충전: M_sms "카드충전-API" 기록만, manyman.payment 미업데이트
+                    paymentService.ifPresentOrElse(
+                            svc -> svc.recordApiCharge(uid, price),
+                            ()  -> log.warn("PaymentService 미설정"));
+                } else {
+                    // 일반 충전: manyman.payment 업데이트 + M_sms "카드충전" + SMS
+                    paymentService.ifPresentOrElse(
+                            svc -> svc.processPaymentSuccess(uid, price),
+                            ()  -> log.warn("PaymentService 미설정 - mssql-manyman 설정을 확인하세요"));
+                }
             } catch (NumberFormatException e) {
                 log.error("결제금액 파싱 오류 - pamount={}", pamount);
                 success = false;
@@ -165,7 +177,7 @@ public class PaymentController {
 
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
-                .body(buildKspayResult(success, amt, msg1));
+                .body(buildKspayResult(success, amt, msg1, isApi));
     }
 
     // -----------------------------------------------------------------------
@@ -258,7 +270,12 @@ public class PaymentController {
     }
 
     /** V1.4 KSPayResult: window.opener(PaymentPage.jsx)에 결과 postMessage */
-    private String buildKspayResult(boolean success, String amt, String msg) {
+    private String buildKspayResult(boolean success, String amt, String msg, boolean isApi) {
+        int chargeAmt = 0;
+        if (success && isApi && !amt.isEmpty()) {
+            try { chargeAmt = (int) Math.floor(Integer.parseInt(amt) / 11.0 * 10); }
+            catch (NumberFormatException ignored) {}
+        }
         return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
                 + "<style>body{font-family:'맑은 고딕',sans-serif;background:#eef2f7;"
                 + "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
@@ -273,7 +290,8 @@ public class PaymentController {
                 + "var amt=" + esc(amt) + ";"
                 + "var msg=" + esc(msg) + ";"
                 + "if(window.opener&&!window.opener.closed){"
-                + "window.opener.postMessage({type:'KSPAY_RESULT',ok:ok,amt:amt,msg:msg},'*');"
+                + "window.opener.postMessage({type:'KSPAY_RESULT',ok:ok,amt:amt,msg:msg,"
+                + "isApiCharge:" + isApi + ",chargeAmt:" + chargeAmt + "},'*');"
                 + "setTimeout(function(){window.close();},1200);"
                 + "}else{"
                 + "document.getElementById('ico').textContent=ok?'✅':'❌';"
