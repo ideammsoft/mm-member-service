@@ -231,6 +231,8 @@ public class PaymentController {
                     paymentService.ifPresentOrElse(
                             svc -> svc.recordApiCharge(uid, price),
                             ()  -> log.warn("PaymentService 미설정"));
+                    // 모바일은 클라이언트로 postMessage 불가 → 서버에서 직접 잔액 충전
+                    if (chargeAmt > 0) callNoimCardCharge(uid, chargeAmt);
                 } else {
                     paymentService.ifPresentOrElse(
                             svc -> svc.processPaymentSuccess(uid, price),
@@ -431,8 +433,9 @@ public class PaymentController {
             encAmt = URLEncoder.encode(amt  == null ? "" : amt,  "UTF-8");
         } catch (Exception ignored) {}
 
+        // isApi=N: 서버에서 이미 충전했으므로 클라이언트 이중충전 방지
         String redirectUrl = "/payment?mobileResult=1&ok=" + success
-                + "&amt=" + encAmt + "&isApi=" + (isApi ? "Y" : "N")
+                + "&amt=" + encAmt + "&isApi=N"
                 + "&chargeAmt=" + chargeAmt + "&uid=" + encUid + "&msg=" + encMsg;
 
         String icon  = success ? "✅" : "❌";
@@ -479,6 +482,26 @@ public class PaymentController {
                 + "document.getElementById('cnt').textContent=s+'초 후 자동으로 이동합니다';s--;setTimeout(tick,1000);}"
                 + "tick();"
                 + "</script></body></html>";
+    }
+
+    /** 모바일 결제 후 noim_sms_balance 충전 — mm-admin-service 직접 호출 */
+    private void callNoimCardCharge(String uid, int chargeAmt) {
+        try {
+            String query = "customerId=" + URLEncoder.encode(uid, "UTF-8")
+                    + "&amount=" + chargeAmt
+                    + "&secret=mmsoft-internal-key-2025";
+            URL url = new URL("http://mm-admin-service:1994/api/noim/sms/card-charge?" + query);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(5_000);
+            conn.setReadTimeout(5_000);
+            conn.connect();
+            int status = conn.getResponseCode();
+            log.info("noim 잔액 충전 완료(모바일): uid={}, chargeAmt={}, status={}", uid, chargeAmt, status);
+            conn.disconnect();
+        } catch (Exception e) {
+            log.error("noim 잔액 충전 실패(모바일): uid={}, chargeAmt={}", uid, chargeAmt, e);
+        }
     }
 
     /** request.getParameter null-safe */
