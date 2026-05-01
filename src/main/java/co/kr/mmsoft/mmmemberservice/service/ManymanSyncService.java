@@ -101,21 +101,21 @@ public class ManymanSyncService {
         }
     }
 
-    /** OAuth 로그인: account.email = manyman.id 로 UPSERT */
+    /** OAuth 프로필 수정: account.homepageId = manyman.id 로 UPSERT (syncOAuthOnLogin과 동일 키) */
     private void syncOAuth(Account account, MemberProfileUpdateRequest req) {
-        String email = account.getEmail();
-        if (email == null || email.isBlank()) {
-            log.warn("manyman 동기화 스킵 - OAuth 계정에 email 없음");
+        String homepageId = account.getHomepageId();
+        if (homepageId == null || homepageId.isBlank()) {
+            log.warn("manyman 동기화 스킵 - OAuth 계정에 homepageId 없음");
             return;
         }
         try (Connection conn = mssqlDataSource.getConnection()) {
-            if (existsById(conn, email)) {
-                update(conn, email, req);
+            if (existsById(conn, homepageId)) {
+                update(conn, homepageId, req);
             } else {
-                insertWithEmptyPassword(conn, email, req);
+                insertWithEmptyPassword(conn, homepageId, req);
             }
         } catch (Exception e) {
-            log.warn("manyman 동기화 실패(OAuth) - email: {}, 오류: {}", email, e.getMessage());
+            log.warn("manyman 동기화 실패(OAuth) - homepageId: {}, 오류: {}", homepageId, e.getMessage());
         }
     }
 
