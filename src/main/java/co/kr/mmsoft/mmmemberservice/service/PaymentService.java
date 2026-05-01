@@ -99,16 +99,20 @@ public class PaymentService {
             return;
         }
         try (Connection conn = manymanDs.getConnection()) {
-            String sql = "INSERT INTO M_sms (id, title, payment) VALUES (?, '카드충전', ?)";
+            String sql = "INSERT INTO M_sms (id, title, payment) VALUES (?, '카드충전-API', ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, id);
                 ps.setInt(2, price);
                 ps.executeUpdate();
                 log.info("M_sms API 카드충전 이력 등록 - id={}, price={}", id, price);
             }
+            String mphone = getMphone(conn, id);
+            if (mphone != null && mphone.startsWith("01")) {
+                sendSmsNotification(id, price, mphone);
+            }
         } catch (Exception e) {
             // M_sms 기록 실패는 잔액 충전을 막지 않도록 경고만 출력 (best-effort logging)
-            log.warn("API 카드충전 M_sms 이력 등록 실패(무시) - id={}, price={}, 오류: {}", id, price, e.getMessage());
+            log.warn("API 카드충전 처리 실패(무시) - id={}, price={}, 오류: {}", id, price, e.getMessage());
         }
     }
 
