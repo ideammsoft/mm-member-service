@@ -190,34 +190,27 @@ public class PaymentController {
     @PostMapping(value = "/kspayresult-mobile", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> kspayresultMobile(HttpServletRequest req) {
 
-        String rcid    = param(req, "reCommConId");
+        // KSPay 모바일 게이트웨이는 결제 검증을 마치고 결과를 POST body에 직접 전달
+        // reCommConId 방식의 KSNET WebHost 재검증은 모바일에서 사용하지 않음
         String cnclType = param(req, "reCnclType");
         String uid     = param(req, "uid");
         String pamount = param(req, "pamount");
         String apiFlg  = param(req, "apiflg");
         boolean isApi  = "Y".equalsIgnoreCase(apiFlg);
 
-        log.info("KSPayResult Mobile - rcid={}, cnclType={}, uid={}, isApi={}", rcid, cnclType, uid, isApi);
+        // KSPay 모바일 POST body에서 직접 결과 수신
+        String authyn = param(req, "authyn");
+        String amt    = param(req, "amt");
+        String msg1   = param(req, "msg1");
+        if (amt.isEmpty()) amt = pamount;
+
+        log.info("KSPayResult Mobile - authyn={}, amt={}, uid={}, isApi={}, cnclType={}",
+                authyn, amt, uid, isApi, cnclType);
 
         if ("1".equals(cnclType)) {
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
                     .body(buildMobileResult(false, "", "결제가 취소되었습니다.", isApi, 0, uid));
-        }
-
-        String sndAmt = param(req, "sndAmount");
-        if (sndAmt.isEmpty()) sndAmt = pamount;
-
-        String authyn = "X", amt = "", msg1 = "";
-        try {
-            Map<String, String> ksnet = callKsnetWebHost(KSNET_MOBILE_WEBHOST_URL, rcid, sndAmt);
-            authyn = ksnet.getOrDefault("authyn", "X");
-            amt    = ksnet.getOrDefault("amt",    "");
-            msg1   = ksnet.getOrDefault("msg1",   "");
-            log.info("KSNET Mobile 검증 결과 - authyn={}, amt={}, msg={}", authyn, amt, msg1);
-        } catch (Exception e) {
-            log.error("KSNET Mobile WebHost 호출 실패", e);
-            msg1 = "결제 검증 오류";
         }
 
         boolean success = "O".equalsIgnoreCase(authyn);
