@@ -38,6 +38,8 @@ public class PaymentController {
 
     private static final String KSNET_WEBHOST_URL =
             "http://kspay.ksnet.to/store/KSPayWebV1.4/web_host/recv_post.jsp";
+    private static final String KSNET_MOBILE_WEBHOST_URL =
+            "http://kspay.ksnet.to/store/KSPayMobileV1.4/web_host/recv_post.jsp";
     private static final String KSNET_RPARAMS =
             "authyn`trno`trddt`trdtm`amt`authno`msg1`msg2`ordno`isscd`aqucd`result`resultcd";
 
@@ -181,6 +183,72 @@ public class PaymentController {
     }
 
     // -----------------------------------------------------------------------
+    // V1.4 Mobile: KSPayMobileRcv.asp 대체
+    //   KSPay mobile → POST sndReply (?uid=&pamount=&apiflg=)
+    //   → KSNET Mobile WebHost 검증 → DB 처리 → 결과 HTML (React /payment 로 리다이렉트)
+    // -----------------------------------------------------------------------
+    @PostMapping(value = "/kspayresult-mobile", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> kspayresultMobile(HttpServletRequest req) {
+
+        String rcid    = param(req, "reCommConId");
+        String cnclType = param(req, "reCnclType");
+        String uid     = param(req, "uid");
+        String pamount = param(req, "pamount");
+        String apiFlg  = param(req, "apiflg");
+        boolean isApi  = "Y".equalsIgnoreCase(apiFlg);
+
+        log.info("KSPayResult Mobile - rcid={}, cnclType={}, uid={}, isApi={}", rcid, cnclType, uid, isApi);
+
+        if ("1".equals(cnclType)) {
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(buildMobileResult(false, "", "결제가 취소되었습니다.", isApi, 0, uid));
+        }
+
+        String sndAmt = param(req, "sndAmount");
+        if (sndAmt.isEmpty()) sndAmt = pamount;
+
+        String authyn = "X", amt = "", msg1 = "";
+        try {
+            Map<String, String> ksnet = callKsnetWebHost(KSNET_MOBILE_WEBHOST_URL, rcid, sndAmt);
+            authyn = ksnet.getOrDefault("authyn", "X");
+            amt    = ksnet.getOrDefault("amt",    "");
+            msg1   = ksnet.getOrDefault("msg1",   "");
+            log.info("KSNET Mobile 검증 결과 - authyn={}, amt={}, msg={}", authyn, amt, msg1);
+        } catch (Exception e) {
+            log.error("KSNET Mobile WebHost 호출 실패", e);
+            msg1 = "결제 검증 오류";
+        }
+
+        boolean success = "O".equalsIgnoreCase(authyn);
+        int chargeAmt = 0;
+
+        if (success && !uid.isEmpty() && !pamount.isEmpty()) {
+            try {
+                int price = Integer.parseInt(pamount);
+                if (isApi) {
+                    chargeAmt = (int) Math.floor(price / 11.0 * 10);
+                    paymentService.ifPresentOrElse(
+                            svc -> svc.recordApiCharge(uid, price),
+                            ()  -> log.warn("PaymentService 미설정"));
+                } else {
+                    paymentService.ifPresentOrElse(
+                            svc -> svc.processPaymentSuccess(uid, price),
+                            ()  -> log.warn("PaymentService 미설정"));
+                }
+            } catch (Exception e) {
+                log.error("Mobile 결제 DB 처리 오류 - uid={}", uid, e);
+                success = false;
+                msg1 = "DB 처리 오류";
+            }
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .body(buildMobileResult(success, amt, msg1, isApi, chargeAmt, uid));
+    }
+
+    // -----------------------------------------------------------------------
     // V1.3 result.asp 대체 (레거시)
     // -----------------------------------------------------------------------
     @PostMapping(value = "/result", produces = MediaType.TEXT_HTML_VALUE)
@@ -212,15 +280,19 @@ public class PaymentController {
     }
 
     // -----------------------------------------------------------------------
-    // KSNET WebHost API 호출 (V1.4 서버 검증)
+    // KSNET WebHost API 호출 (V1.4 서버 검증) - desktop/mobile 공용
     // -----------------------------------------------------------------------
     private Map<String, String> callKsnetWebHost(String rcid, String amount) throws Exception {
+        return callKsnetWebHost(KSNET_WEBHOST_URL, rcid, amount);
+    }
+
+    private Map<String, String> callKsnetWebHost(String webHostUrl, String rcid, String amount) throws Exception {
         String query = "sndCommConId=" + URLEncoder.encode(rcid, "UTF-8")
                 + "&sndActionType=1"
                 + "&sndAmount=" + URLEncoder.encode(amount, "UTF-8")
                 + "&sndRpyParams=" + URLEncoder.encode(KSNET_RPARAMS, "UTF-8");
 
-        URL url = new URL(KSNET_WEBHOST_URL + "?" + query);
+        URL url = new URL(webHostUrl + "?" + query);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(15_000);
@@ -348,6 +420,65 @@ public class PaymentController {
                 + "<script>var s=5;function tick(){if(s<=0){window.close();return;}"
                 + "document.getElementById('cnt').innerHTML=s+'초 후 자동으로 닫힙니다';s--;setTimeout(tick,1000);}"
                 + "tick();</script></body></html>";
+    }
+
+    /** V1.4 Mobile 결과: 결과 표시 후 React /payment?mobileResult=1&... 으로 리다이렉트 */
+    private String buildMobileResult(boolean success, String amt, String msg, boolean isApi, int chargeAmt, String uid) {
+        String encMsg = "", encUid = "", encAmt = "";
+        try {
+            encMsg = URLEncoder.encode(msg  == null ? "" : msg,  "UTF-8");
+            encUid = URLEncoder.encode(uid  == null ? "" : uid,  "UTF-8");
+            encAmt = URLEncoder.encode(amt  == null ? "" : amt,  "UTF-8");
+        } catch (Exception ignored) {}
+
+        String redirectUrl = "/payment?mobileResult=1&ok=" + success
+                + "&amt=" + encAmt + "&isApi=" + (isApi ? "Y" : "N")
+                + "&chargeAmt=" + chargeAmt + "&uid=" + encUid + "&msg=" + encMsg;
+
+        String icon  = success ? "✅" : "❌";
+        String title = success ? "결제가 완료되었습니다" : "결제가 완료되지 않았습니다";
+        String detail;
+        if (success) {
+            detail = isApi && chargeAmt > 0
+                ? "결제금액 " + amt + "원 중 부가세 제외<br>" + chargeAmt + "원이 충전 처리됩니다."
+                : amt + "원 결제가 처리되었습니다.";
+        } else {
+            detail = (msg == null || msg.isEmpty()) ? "결제가 취소되었거나 오류가 발생했습니다." : msg;
+        }
+        String color = success ? "#1a73e8" : "#e53e3e";
+
+        return "<!DOCTYPE html><html lang=\"ko\">"
+                + "<head><meta charset=\"UTF-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                + "<title>" + (success ? "결제완료" : "결제실패") + "</title>"
+                + "<style>"
+                + "body{font-family:'맑은 고딕',sans-serif;background:#eef2f7;"
+                + "min-height:100vh;display:flex;align-items:center;justify-content:center;"
+                + "margin:0;padding:16px;box-sizing:border-box}"
+                + ".box{background:#fff;border-radius:10px;padding:32px 24px;"
+                + "text-align:center;max-width:400px;width:100%;"
+                + "box-shadow:0 2px 12px rgba(0,0,0,.1)}"
+                + ".icon{font-size:48px;margin-bottom:16px}"
+                + ".title{font-size:18px;font-weight:bold;margin-bottom:12px;color:" + color + "}"
+                + ".detail{font-size:14px;color:#555;line-height:1.8;margin-bottom:24px}"
+                + ".btn{display:inline-block;padding:12px 32px;background:" + color + ";"
+                + "color:#fff;text-decoration:none;border-radius:6px;"
+                + "font-size:15px;font-weight:bold}"
+                + ".cnt{font-size:12px;color:#999;margin-top:12px}"
+                + "</style></head>"
+                + "<body><div class=\"box\">"
+                + "<div class=\"icon\">" + icon + "</div>"
+                + "<div class=\"title\">" + title + "</div>"
+                + "<div class=\"detail\">" + detail + "</div>"
+                + "<a class=\"btn\" href=\"" + redirectUrl + "\">홈으로 돌아가기</a>"
+                + "<div class=\"cnt\" id=\"cnt\"></div>"
+                + "</div>"
+                + "<script>"
+                + "var s=5,url=" + esc(redirectUrl) + ";"
+                + "function tick(){if(s<=0){window.location.href=url;return;}"
+                + "document.getElementById('cnt').textContent=s+'초 후 자동으로 이동합니다';s--;setTimeout(tick,1000);}"
+                + "tick();"
+                + "</script></body></html>";
     }
 
     /** request.getParameter null-safe */
