@@ -116,7 +116,8 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
 
         // MSSQL manyman 동기화: email로 없으면 INSERT (phone/company는 빈칸)
         log.debug("manyman 동기화 시도 - syncService 존재: {}, email: {}", manymanSyncService.isPresent(), email);
-        manymanSyncService.ifPresent(svc -> svc.syncOAuthOnLogin(account.getHomepageId(), name, email));
+        final String syncId = account.getHomepageId();
+        manymanSyncService.ifPresent(svc -> svc.syncOAuthOnLogin(syncId, name, email));
 
         // Spring Security에 OidcUser 그대로 반환
         // OAuth2LoginSuccessHandler에서 oidcUser.getSubject()로 openId를 추출합니다
