@@ -190,22 +190,45 @@ public class PaymentController {
     @PostMapping(value = "/kspayresult-mobile", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> kspayresultMobile(HttpServletRequest req) {
 
-        // KSPay 모바일 게이트웨이는 결제 검증을 마치고 결과를 POST body에 직접 전달
-        // reCommConId 방식의 KSNET WebHost 재검증은 모바일에서 사용하지 않음
         String cnclType = param(req, "reCnclType");
         String uid     = param(req, "uid");
         String pamount = param(req, "pamount");
         String apiFlg  = param(req, "apiflg");
         boolean isApi  = "Y".equalsIgnoreCase(apiFlg);
 
-        // KSPay 모바일 POST body에서 직접 결과 수신
+        // 1) KSPay 모바일이 authyn을 POST body에 직접 보내는 경우
         String authyn = param(req, "authyn");
         String amt    = param(req, "amt");
         String msg1   = param(req, "msg1");
         if (amt.isEmpty()) amt = pamount;
 
-        log.info("KSPayResult Mobile - authyn={}, amt={}, uid={}, isApi={}, cnclType={}",
+        log.info("KSPayResult Mobile params - authyn={}, amt={}, uid={}, isApi={}, cnclType={}",
                 authyn, amt, uid, isApi, cnclType);
+
+        // 2) authyn 없으면 reCommConId 방식 WebHost 검증으로 폴백
+        if (authyn.isEmpty()) {
+            String rcid   = param(req, "reCommConId");
+            String sndAmt = param(req, "sndAmount");
+            if (sndAmt.isEmpty()) sndAmt = pamount;
+            log.info("KSPayResult Mobile WebHost fallback - rcid={}, sndAmt={}", rcid, sndAmt);
+            if (!rcid.isEmpty()) {
+                try {
+                    Map<String, String> ksnet = callKsnetWebHost(KSNET_MOBILE_WEBHOST_URL, rcid, sndAmt);
+                    authyn = ksnet.getOrDefault("authyn", "X");
+                    amt    = ksnet.getOrDefault("amt",    pamount);
+                    msg1   = ksnet.getOrDefault("msg1",   "");
+                    log.info("KSNET Mobile WebHost 결과 - authyn={}, amt={}", authyn, amt);
+                } catch (Exception e) {
+                    log.error("KSNET Mobile WebHost 호출 실패", e);
+                    authyn = "X";
+                    msg1   = "결제 검증 오류";
+                }
+            } else {
+                authyn = "X";
+                msg1   = "결제 결과를 확인할 수 없습니다.";
+                log.warn("KSPayResult Mobile - authyn/reCommConId 모두 없음");
+            }
+        }
 
         if ("1".equals(cnclType)) {
             return ResponseEntity.ok()
