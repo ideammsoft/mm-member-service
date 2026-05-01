@@ -99,7 +99,7 @@ public class PaymentService {
             return;
         }
         try (Connection conn = manymanDs.getConnection()) {
-            String sql = "INSERT INTO M_sms (id, title, payment) VALUES (?, '카드충전-API', ?)";
+            String sql = "INSERT INTO M_sms (id, title, payment) VALUES (?, '카드충전', ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, id);
                 ps.setInt(2, price);
