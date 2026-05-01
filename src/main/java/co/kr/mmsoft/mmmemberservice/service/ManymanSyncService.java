@@ -182,29 +182,34 @@ public class ManymanSyncService {
      * @param email OAuth 이메일 (manyman.id 로 사용)
      * @param name  OAuth 이름
      */
-    public void syncOAuthOnLogin(String email, String name) {
-        if (email == null || email.isBlank()) {
-            log.warn("manyman 로그인 동기화 스킵 - email 없음");
+    /**
+     * OAuth 최초 로그인 시 manyman INSERT
+     * manyman.id = homepageId (결제 uid와 일치시키기 위함)
+     * email은 manyman.email 컬럼에 저장
+     */
+    public void syncOAuthOnLogin(String homepageId, String name, String email) {
+        if (homepageId == null || homepageId.isBlank()) {
+            log.warn("manyman 로그인 동기화 스킵 - homepageId 없음");
             return;
         }
         try (Connection conn = mssqlDataSource.getConnection()) {
-            if (!existsById(conn, email)) {
+            if (!existsById(conn, homepageId)) {
                 String sql = """
                         INSERT INTO manyman (id, passwd, payment, version, name, email, phone, mphone, company, password, editdate)
                         VALUES (?, '', 0, '', ?, ?, '', '', '', '', CONVERT(NVARCHAR(10), GETDATE(), 23))
                         """;
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, email);
-                    ps.setString(2, name != null ? name : "");
-                    ps.setString(3, email);
+                    ps.setString(1, homepageId);
+                    ps.setString(2, name  != null ? name  : "");
+                    ps.setString(3, email != null ? email : "");
                     int rows = ps.executeUpdate();
-                    log.info("manyman INSERT 완료(OAuth 최초 로그인) - email: {}, 행수: {}", email, rows);
+                    log.info("manyman INSERT 완료(OAuth 최초 로그인) - homepageId: {}, email: {}, 행수: {}", homepageId, email, rows);
                 }
             } else {
-                log.debug("manyman 동기화 스킵(OAuth 로그인) - 이미 존재: {}", email);
+                log.debug("manyman 동기화 스킵(OAuth 로그인) - 이미 존재: {}", homepageId);
             }
         } catch (Exception e) {
-            log.warn("manyman 동기화 실패(OAuth 로그인) - email: {}, 오류: {}", email, e.getMessage());
+            log.warn("manyman 동기화 실패(OAuth 로그인) - homepageId: {}, 오류: {}", homepageId, e.getMessage());
         }
     }
 

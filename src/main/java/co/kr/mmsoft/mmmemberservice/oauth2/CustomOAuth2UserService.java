@@ -133,7 +133,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // MSSQL manyman 동기화: email로 없으면 INSERT (phone/company는 빈칸)
-        manymanSyncService.ifPresent(svc -> svc.syncOAuthOnLogin(info.email(), info.name()));
+        manymanSyncService.ifPresent(svc -> svc.syncOAuthOnLogin(account.getHomepageId(), info.name(), info.email()));
 
         // Spring Security가 사용할 권한 목록 (일단 customer 역할 부여)
         Collection<GrantedAuthority> authorities = List.of(
