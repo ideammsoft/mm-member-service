@@ -109,7 +109,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         if (account == null) {
             // ★ 처음 로그인하는 경우 → 자동 회원가입 ★
-            String homepageId = generateHomepageId(info.email());
+            String homepageId = generateHomepageId(info.email(), info.openId());
             account = Account.builder()
                     .openId(info.openId())    // 공급자의 고유 ID
                     .homepageId(homepageId)   // 이메일 앞부분으로 자동 생성
@@ -153,11 +153,17 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return new DefaultOAuth2User(authorities, attrs, "openId");
     }
 
-    /** 이메일 앞부분으로 homepage_id 자동 생성 (중복 시 숫자 suffix 추가) */
-    private String generateHomepageId(String email) {
-        String prefix = (email != null && email.contains("@"))
-                ? email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9]", "")
-                : "user";
+    /** 이메일 앞부분으로 homepage_id 자동 생성. 이메일 없으면 openId 앞 12자 사용. */
+    private String generateHomepageId(String email, String openId) {
+        String prefix;
+        if (email != null && email.contains("@")) {
+            prefix = email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9]", "");
+        } else if (openId != null && !openId.isBlank()) {
+            prefix = openId.toLowerCase().replaceAll("[^a-z0-9]", "");
+            if (prefix.length() > 12) prefix = prefix.substring(0, 12);
+        } else {
+            prefix = "user";
+        }
         if (prefix.isEmpty()) prefix = "user";
         String candidate = prefix;
         int suffix = 1;

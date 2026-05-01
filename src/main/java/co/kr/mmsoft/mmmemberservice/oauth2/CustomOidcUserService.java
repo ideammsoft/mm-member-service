@@ -92,7 +92,7 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
 
         if (account == null) {
             // 처음 로그인 → 자동 회원가입
-            String homepageId = generateHomepageId(email);
+            String homepageId = generateHomepageId(email, openId);
             account = Account.builder()
                     .openId(openId)          // Google의 sub 값 (고유 식별자)
                     .homepageId(homepageId)  // 이메일 앞부분으로 자동 생성
@@ -123,10 +123,16 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
         return oidcUser;
     }
 
-    private String generateHomepageId(String email) {
-        String prefix = (email != null && email.contains("@"))
-                ? email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9]", "")
-                : "user";
+    private String generateHomepageId(String email, String openId) {
+        String prefix;
+        if (email != null && email.contains("@")) {
+            prefix = email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9]", "");
+        } else if (openId != null && !openId.isBlank()) {
+            prefix = openId.toLowerCase().replaceAll("[^a-z0-9]", "");
+            if (prefix.length() > 12) prefix = prefix.substring(0, 12);
+        } else {
+            prefix = "user";
+        }
         if (prefix.isEmpty()) prefix = "user";
         String candidate = prefix;
         int suffix = 1;
