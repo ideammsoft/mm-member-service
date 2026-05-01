@@ -7,8 +7,8 @@
 <!--        select * from Blog where id = #{id}-->
 <!--    </select>-->
     <insert id = "insert" parameterType="Account" useGeneratedKeys="true" keyProperty="accountId">
-        insert into account(open_id, password, name, email, mphone, phone, company, provider_id)
-        values(#{openId},#{password},#{name},#{email},#{mphone},#{phone},#{company},#{provider.providerId})
+        insert into account(open_id, homepage_id, password, name, email, mphone, phone, company, provider_id)
+        values(#{openId},#{homepageId},#{password},#{name},#{email},#{mphone},#{phone},#{company},#{provider.providerId})
 
 <!--        아래의 코드가 FM적인 코드.. but 줄여쓰는 방식도 가능-->
 <!--        <selectKey keyColumn="account_id" keyProperty="account_id" order="AFTER" resultType="int">-->
@@ -23,6 +23,7 @@
     <resultMap id="AccountMap" type="Account">
         <id column="account_id" property="accountId"/>
         <result column="open_id" property="openId"/>
+        <result column="homepage_id" property="homepageId"/>
         <result column="password" property="password"/>
         <result column="name" property="name"/>
         <result column="email" property="email"/>
@@ -40,12 +41,15 @@
         />
     </resultMap>
     <select id="findByOpenId" parameterType="String" resultMap="AccountMap">
-        select account_id, open_id, password, name, email, mphone, phone, company, provider_id
+        select account_id, open_id, homepage_id, password, name, email, mphone, phone, company, provider_id
         from account
         where open_id=#{openId}
     </select>
     <select id="checkByOpenId" parameterType="String" resultType="int">
         select count(*) as cnt from account where open_id=#{openId}
+    </select>
+    <select id="checkByHomepageId" parameterType="String" resultType="int">
+        select count(*) as cnt from account where homepage_id=#{homepageId}
     </select>
     <select id="idFindByEmail" parameterType="String" resultType="String">
         SELECT open_id
@@ -78,7 +82,7 @@
 
     <!-- OAuth2 소셜 로그인 전용 - 공급자 이름 + openId로 회원 조회 -->
     <select id="findByProviderAndOpenId" resultMap="AccountMap">
-        SELECT a.account_id, a.open_id, a.password, a.name, a.email, a.mphone, a.phone, a.company, a.provider_id
+        SELECT a.account_id, a.open_id, a.homepage_id, a.password, a.name, a.email, a.mphone, a.phone, a.company, a.provider_id
         FROM account a
         JOIN provider p ON a.provider_id = p.provider_id
         WHERE p.provider_name = #{providerName}
@@ -87,7 +91,7 @@
 
     <!-- accountId(PK)로 회원 조회 - JWT 필터 및 회원정보 조회에 사용 -->
     <select id="findByAccountId" parameterType="Long" resultMap="AccountMap">
-        SELECT account_id, open_id, password, name, email, mphone, phone, company, provider_id
+        SELECT account_id, open_id, homepage_id, password, name, email, mphone, phone, company, provider_id
         FROM account
         WHERE account_id = #{accountId}
     </select>

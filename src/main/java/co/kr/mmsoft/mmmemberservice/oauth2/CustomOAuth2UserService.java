@@ -109,8 +109,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         if (account == null) {
             // ★ 처음 로그인하는 경우 → 자동 회원가입 ★
+            String homepageId = generateHomepageId(info.email());
             account = Account.builder()
                     .openId(info.openId())    // 공급자의 고유 ID
+                    .homepageId(homepageId)   // 이메일 앞부분으로 자동 생성
                     .name(info.name())        // 공급자가 제공한 이름
                     .email(info.email())      // 공급자가 제공한 이메일
                     .provider(provider)       // 공급자 정보 (google/naver/kakao)
@@ -124,7 +126,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             if (role != null) {
                 accountRoleMapper.insert(new AccountRole(account, role));
             }
-            log.debug("OAuth2 신규 회원가입 완료: {}", info.name());
+            log.debug("OAuth2 신규 회원가입 완료: {}, homepageId={}", info.name(), homepageId);
         } else {
             // 이미 가입된 회원인 경우 → 그냥 로그인 처리
             log.debug("OAuth2 기존 회원 로그인: {}", info.name());
@@ -149,5 +151,19 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         // 두 번째 매개변수(attrs)의 세 번째 매개변수("openId")가 "주 속성 키"입니다.
         // 나중에 authentication.getName()을 호출하면 openId 값이 반환됩니다.
         return new DefaultOAuth2User(authorities, attrs, "openId");
+    }
+
+    /** 이메일 앞부분으로 homepage_id 자동 생성 (중복 시 숫자 suffix 추가) */
+    private String generateHomepageId(String email) {
+        String prefix = (email != null && email.contains("@"))
+                ? email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9]", "")
+                : "user";
+        if (prefix.isEmpty()) prefix = "user";
+        String candidate = prefix;
+        int suffix = 1;
+        while (accountMapper.checkByHomepageId(candidate) > 0) {
+            candidate = prefix + suffix++;
+        }
+        return candidate;
     }
 }

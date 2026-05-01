@@ -58,6 +58,11 @@ public class Account {
     // SNS 로그인: 구글/네이버/카카오가 제공하는 고유 식별값
     private String openId;
 
+    // account 테이블의 homepage_id 컬럼
+    // 결제/문자 충전에 사용하는 서비스 고유 ID
+    // 일반 가입: openId와 동일, OAuth 가입: 이메일 앞부분 자동 생성
+    private String homepageId;
+
     // account 테이블의 password 컬럼
     // BCrypt로 암호화된 비밀번호가 저장됩니다 (평문 저장 절대 금지!)
     // SNS 로그인 회원은 null입니다
@@ -101,16 +106,17 @@ public class Account {
      *       .build();
      */
     @Builder
-    public Account(Long accountId, String openId, String password, String name,
+    public Account(Long accountId, String openId, String homepageId, String password, String name,
                    String email, String mphone, String phone, String company, Provider provider) {
-        this.accountId = accountId;
-        this.openId    = openId;
-        this.password  = password;
-        this.name      = name;
-        this.email     = email;
-        this.mphone    = mphone;
-        this.phone     = phone;
-        this.company   = company;
-        this.provider  = provider;
+        this.accountId  = accountId;
+        this.openId     = openId;
+        this.homepageId = homepageId;
+        this.password   = password;
+        this.name       = name;
+        this.email      = email;
+        this.mphone     = mphone;
+        this.phone      = phone;
+        this.company    = company;
+        this.provider   = provider;
     }
 }

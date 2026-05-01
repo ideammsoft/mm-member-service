@@ -57,6 +57,9 @@ public interface AccountMapper {
      */
     int checkByOpenId(String openId);
 
+    /** homepage_id 중복 확인 */
+    int checkByHomepageId(@Param("homepageId") String homepageId);
+
     /**
      * 이메일로 아이디 찾기 - 이메일 주소로 로그인 아이디를 조회합니다.
      *

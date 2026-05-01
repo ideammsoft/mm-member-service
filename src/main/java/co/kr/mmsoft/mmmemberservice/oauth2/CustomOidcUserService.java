@@ -92,11 +92,13 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
 
         if (account == null) {
             // 처음 로그인 → 자동 회원가입
+            String homepageId = generateHomepageId(email);
             account = Account.builder()
-                    .openId(openId)      // Google의 sub 값 (고유 식별자)
-                    .name(name)          // Google 계정 이름
-                    .email(email)        // Google 이메일
-                    .provider(provider) // Google 공급자 정보
+                    .openId(openId)          // Google의 sub 값 (고유 식별자)
+                    .homepageId(homepageId)  // 이메일 앞부분으로 자동 생성
+                    .name(name)              // Google 계정 이름
+                    .email(email)            // Google 이메일
+                    .provider(provider)      // Google 공급자 정보
                     .build();
 
             accountMapper.insert(account);
@@ -106,7 +108,7 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
             if (role != null) {
                 accountRoleMapper.insert(new AccountRole(account, role));
             }
-            log.debug("Google 신규 회원가입 완료: {}", name);
+            log.debug("Google 신규 회원가입 완료: {}, homepageId={}", name, homepageId);
 
         } else {
             log.debug("Google 기존 회원 로그인: {}", name);
@@ -119,5 +121,18 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
         // Spring Security에 OidcUser 그대로 반환
         // OAuth2LoginSuccessHandler에서 oidcUser.getSubject()로 openId를 추출합니다
         return oidcUser;
+    }
+
+    private String generateHomepageId(String email) {
+        String prefix = (email != null && email.contains("@"))
+                ? email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9]", "")
+                : "user";
+        if (prefix.isEmpty()) prefix = "user";
+        String candidate = prefix;
+        int suffix = 1;
+        while (accountMapper.checkByHomepageId(candidate) > 0) {
+            candidate = prefix + suffix++;
+        }
+        return candidate;
     }
 }

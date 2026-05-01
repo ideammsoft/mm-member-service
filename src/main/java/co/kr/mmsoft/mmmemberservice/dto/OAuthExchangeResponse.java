@@ -16,10 +16,11 @@ public class OAuthExchangeResponse {
     private final String  phone;
     private final String  company;
     private final String  provider;
+    private final String  homepageId;
     private final boolean isNewMember;
 
     public OAuthExchangeResponse(String accessToken, String name, String email,
-                                  String mphone, String phone, String company, String provider) {
+                                  String mphone, String phone, String company, String provider, String homepageId) {
         this.accessToken = accessToken;
         this.name        = name;
         this.email       = email;
@@ -27,6 +28,7 @@ public class OAuthExchangeResponse {
         this.phone       = phone;
         this.company     = company;
         this.provider    = provider;
+        this.homepageId  = homepageId;
         this.isNewMember = (mphone == null || mphone.isBlank());
     }
 }
