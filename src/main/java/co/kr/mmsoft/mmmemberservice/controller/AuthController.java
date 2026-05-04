@@ -117,7 +117,7 @@ public class AuthController {
 
         // AccessToken은 응답 body에 담아서 전달
         // (프론트에서 메모리/localStorage에 보관 후 API 호출 시 Authorization 헤더에 첨부)
-        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken(), authTokens.getName(), authTokens.getRoleName(), authTokens.getAccountId());
+        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken(), authTokens.getName(), authTokens.getEmail(), authTokens.getRoleName(), authTokens.getAccountId());
 
         // RefreshToken은 HttpOnly 쿠키로 전달
         // HttpOnly: JavaScript에서 접근 불가 → XSS 공격으로부터 보호

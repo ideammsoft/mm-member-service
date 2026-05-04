@@ -8,6 +8,7 @@ import lombok.Setter;
 public class LoginResponse {
     private String accessToken;
     private String name;
+    private String email;
     private String roleName;
     private Long accountId;
 
@@ -17,9 +18,10 @@ public class LoginResponse {
         this.roleName = roleName;
     }
 
-    public LoginResponse(String accessToken, String name, String roleName, Long accountId) {
+    public LoginResponse(String accessToken, String name, String email, String roleName, Long accountId) {
         this.accessToken = accessToken;
         this.name = name;
+        this.email = email;
         this.roleName = roleName;
         this.accountId = accountId;
     }

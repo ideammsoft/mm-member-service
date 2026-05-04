@@ -11,13 +11,15 @@ public class AuthTokens {
     private String accessToken;
     private String refreshToken;
     private String name;
+    private String email;
     private String roleName;
     private Long accountId;
 
-    public AuthTokens(String accessToken, String refreshToken, String name, String roleName, Long accountId) {
+    public AuthTokens(String accessToken, String refreshToken, String name, String email, String roleName, Long accountId) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.name = name;
+        this.email = email;
         this.roleName = roleName;
         this.accountId = accountId;
     }
