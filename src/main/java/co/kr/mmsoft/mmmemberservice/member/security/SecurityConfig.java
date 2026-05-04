@@ -223,6 +223,11 @@ public class SecurityConfig {
                 )
                 // 소셜 로그인 성공 후 실행할 핸들러 등록 (JWT 발급 + 리다이렉트)
                 .successHandler(oAuth2LoginSuccessHandler)
+                // 소셜 로그인 실패 시 내부 IP 노출 방지 — 프론트 로그인 페이지로 리다이렉트
+                .failureHandler((request, response, exception) -> {
+                    log.error("OAuth2 로그인 실패: {} - {}", exception.getClass().getSimpleName(), exception.getMessage());
+                    response.sendRedirect(frontendUrl + "/login?error");
+                })
         );
 
         // 인증 실패 시 OAuth2 redirect 대신 401 반환 (REST API용)
