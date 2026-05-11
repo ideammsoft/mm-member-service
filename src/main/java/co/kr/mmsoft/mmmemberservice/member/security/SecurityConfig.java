@@ -202,6 +202,9 @@ public class SecurityConfig {
                 // /api/payment/** : KSPay 결제 콜백 (KSNET 서버 → 인증 없이 호출됨)
                 .requestMatchers("/api/payment/**").permitAll()
 
+                // /api/blacklist/ars-reject : Ppurio 080 ARS 수신거부 콜백 (외부 서버 → 인증 없이 호출됨)
+                .requestMatchers("/api/blacklist/ars-reject").permitAll()
+
                 // 그 외 모든 경로 → 로그인(인증) 필요
                 .anyRequest().authenticated()
         );
