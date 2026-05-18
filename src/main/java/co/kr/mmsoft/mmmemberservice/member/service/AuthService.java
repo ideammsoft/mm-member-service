@@ -228,6 +228,16 @@ public class AuthService {
         String phone  = request.getPhone();
         boolean foundInAccount = false;
 
+        // NICE 본인인증 방식: openId 없이 phone만 넘어온 경우 → phone으로 openId 자동 조회
+        if ((openId == null || openId.isBlank()) && phone != null && !phone.isBlank()) {
+            String foundOpenId = accountMapper.idFindByPhone(phone);
+            if (foundOpenId != null) {
+                request.setOpenId(foundOpenId);
+                openId = foundOpenId;
+                log.info("NICE 본인인증 비밀번호찾기: phone={} → openId={}", phone, openId);
+            }
+        }
+
         // 본인 확인: 아이디 + 이메일 또는 아이디 + 전화번호 일치 여부
         if (email != null && !email.isEmpty()) {
             foundInAccount = accountMapper.passwordFindByEmail(request) > 0;
