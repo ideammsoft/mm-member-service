@@ -7,6 +7,7 @@ import co.kr.mmsoft.mmmemberservice.mybatis.domain.Account;
 import co.kr.mmsoft.mmmemberservice.mybatis.mapper.AccountMapper;
 import co.kr.mmsoft.mmmemberservice.redis.RedisRefreshTokenStore;
 import co.kr.mmsoft.mmmemberservice.service.EmailService;
+import co.kr.mmsoft.mmmemberservice.service.ManymanSyncService;
 import co.kr.mmsoft.mmmemberservice.service.SmsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,10 @@ public class AuthController {
     /** ppurio DB 미설정 시 null (ConditionalOnProperty) */
     @Autowired(required = false)
     private SmsService smsService;
+
+    /** MSSQL manyman DB 미설정 시 null (ConditionalOnProperty) */
+    @Autowired(required = false)
+    private ManymanSyncService manymanSyncService;
 
     /*─────────────────────────────────────────────────────
      * [1] 회원가입 API
@@ -136,7 +141,20 @@ public class AuthController {
 
 
     /*─────────────────────────────────────────────────────
-     * [3] 아이디 중복 확인 API
+     * [3] ManDeul 연장기한 조회 API (로그인 전 공개)
+     * GET /api/auth/expiry?id={homepageId}
+     * 응답: "2027-03-05" 또는 "" (미등록/미설정)
+     ─────────────────────────────────────────────────────*/
+    @GetMapping("/expiry")
+    public ResponseEntity<String> expiry(@RequestParam String id) {
+        if (manymanSyncService == null || id == null || id.isBlank())
+            return ResponseEntity.ok("");
+        String expiry = manymanSyncService.getExpiryDate(id.trim());
+        return ResponseEntity.ok(expiry != null ? expiry : "");
+    }
+
+    /*─────────────────────────────────────────────────────
+     * [4] 아이디 중복 확인 API
      * POST /api/auth/idcheck
      * 요청 Body: { "openId": "hong123" }
      * 응답:      { "count": 0 }  → 0이면 사용 가능, 1이면 중복
