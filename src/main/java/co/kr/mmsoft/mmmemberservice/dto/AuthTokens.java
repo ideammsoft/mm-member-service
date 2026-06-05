@@ -14,13 +14,15 @@ public class AuthTokens {
     private String email;
     private String roleName;
     private Long accountId;
+    private String expiryDate;
 
-    public AuthTokens(String accessToken, String refreshToken, String name, String email, String roleName, Long accountId) {
+    public AuthTokens(String accessToken, String refreshToken, String name, String email, String roleName, Long accountId, String expiryDate) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.name = name;
         this.email = email;
         this.roleName = roleName;
         this.accountId = accountId;
+        this.expiryDate = expiryDate;
     }
 }

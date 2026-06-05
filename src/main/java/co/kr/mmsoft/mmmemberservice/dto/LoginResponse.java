@@ -11,6 +11,7 @@ public class LoginResponse {
     private String email;
     private String roleName;
     private Long accountId;
+    private String expiryDate;
 
     public LoginResponse(String accessToken, String name, String roleName) {
         this.accessToken = accessToken;
@@ -24,5 +25,14 @@ public class LoginResponse {
         this.email = email;
         this.roleName = roleName;
         this.accountId = accountId;
+    }
+
+    public LoginResponse(String accessToken, String name, String email, String roleName, Long accountId, String expiryDate) {
+        this.accessToken = accessToken;
+        this.name = name;
+        this.email = email;
+        this.roleName = roleName;
+        this.accountId = accountId;
+        this.expiryDate = expiryDate;
     }
 }

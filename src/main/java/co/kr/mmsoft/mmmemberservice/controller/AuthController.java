@@ -117,7 +117,7 @@ public class AuthController {
 
         // AccessToken은 응답 body에 담아서 전달
         // (프론트에서 메모리/localStorage에 보관 후 API 호출 시 Authorization 헤더에 첨부)
-        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken(), authTokens.getName(), authTokens.getEmail(), authTokens.getRoleName(), authTokens.getAccountId());
+        LoginResponse loginResponse = new LoginResponse(authTokens.getAccessToken(), authTokens.getName(), authTokens.getEmail(), authTokens.getRoleName(), authTokens.getAccountId(), authTokens.getExpiryDate());
 
         // RefreshToken은 HttpOnly 쿠키로 전달
         // HttpOnly: JavaScript에서 접근 불가 → XSS 공격으로부터 보호
@@ -292,6 +292,25 @@ public class AuthController {
                 provider,
                 account.getHomepageId()
         ));
+    }
+
+    /** 이메일 미설정 회원에게 이메일 저장 (PATCH /api/auth/me/email) */
+    @PatchMapping("/me/email")
+    public ResponseEntity<?> updateMyEmail(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody Map<String, String> body) {
+        String email = body.getOrDefault("email", "").trim();
+        if (email.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "이메일을 입력해 주세요."));
+        if (authHeader == null || !authHeader.startsWith("Bearer "))
+            return ResponseEntity.status(401).body(Map.of("message", "인증이 필요합니다."));
+        try {
+            Long accountId = Long.parseLong(
+                    jwtTokenProvider.validateAndGetClaims(authHeader.substring(7)).getSubject());
+            int updated = accountMapper.updateEmailIfEmpty(accountId, email);
+            return ResponseEntity.ok(Map.of("success", updated > 0));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(Map.of("message", "토큰이 유효하지 않습니다."));
+        }
     }
 
     /** 광고 페이지 문의 폼 메일 발송 (POST /api/auth/contact) */

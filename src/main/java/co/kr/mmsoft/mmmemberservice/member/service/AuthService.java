@@ -180,9 +180,15 @@ public class AuthService {
                 .map(r -> r.replace("ROLE_", ""))
                 .orElse("customer");
 
+        // MSSQL manyman 테이블에서 연장기한 조회 (?1?2027-03-05! 형식 파싱)
+        String expiryDate = null;
+        if (manymanSyncService != null) {
+            expiryDate = manymanSyncService.getExpiryDate(account.getOpenId());
+        }
+
         // AccessToken과 RefreshToken을 한 객체에 담아 반환
         // Controller에서 AT는 응답 body에, RT는 HttpOnly 쿠키에 담아 클라이언트로 전송
-        return new AuthTokens(accessToken, refreshToken, account.getName(), account.getEmail(), roleName, account.getAccountId());
+        return new AuthTokens(accessToken, refreshToken, account.getName(), account.getEmail(), roleName, account.getAccountId(), expiryDate);
     }
 
     /*========================================

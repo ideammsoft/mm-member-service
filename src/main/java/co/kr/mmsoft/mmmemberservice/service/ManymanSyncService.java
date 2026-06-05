@@ -214,6 +214,39 @@ public class ManymanSyncService {
     }
 
     /**
+     * manyman.version 컬럼에서 ManDeul 연장기한 추출
+     * 저장 형식: ?1?2027-03-05! (맨들) / ?2?2027-03-05! (맨들지로)
+     * @return "2027-03-05" 형식 문자열, 없으면 null
+     */
+    public String getExpiryDate(String openId) {
+        if (openId == null || openId.isBlank()) return null;
+        String sql = "SELECT TOP 1 version FROM manyman WHERE id = ? AND isDelete = 0";
+        try (Connection conn = mssqlDataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, openId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return parseExpiry(rs.getString("version"));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("만료일 조회 실패 - openId: {}, 오류: {}", openId, e.getMessage());
+        }
+        return null;
+    }
+
+    /** ?1?2027-03-05! → "2027-03-05" 파싱 */
+    private String parseExpiry(String version) {
+        if (version == null || version.isBlank()) return null;
+        int secondQ = version.indexOf('?', 1); // 두 번째 '?' 위치
+        if (secondQ < 0) return null;
+        int start = secondQ + 1;
+        int end   = version.indexOf('!', start);
+        if (end < 0 || end - start != 10) return null;
+        return version.substring(start, end);
+    }
+
+    /**
      * 아이디 + 휴대폰번호로 manyman 조회 (비밀번호 찾기 fallback용)
      * 전화번호 하이픈/공백 자동 정규화
      *
