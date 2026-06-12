@@ -267,6 +267,35 @@ public class ManymanSyncService {
         return null;
     }
 
+    /** 프로그램에서 쓰는 manyman 필드 묶음 반환 (VB6 로그인 후 전역변수 세팅용). */
+    public Map<String, String> getUserInfo(String openId) {
+        Map<String, String> m = new HashMap<>();
+        if (openId == null || openId.isBlank()) return m;
+        String sql = "SELECT TOP 1 kwanhan, LGid, LGpass, LGmanyman, fax, serviceid, jirono, company " +
+                     "FROM manyman WHERE id = ? AND isDelete = 0";
+        try (Connection conn = mssqlDataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, openId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    m.put("kwanhan",   nz(rs.getString("kwanhan")));
+                    m.put("lgId",      nz(rs.getString("LGid")));
+                    m.put("lgPass",    nz(rs.getString("LGpass")));
+                    m.put("lgManyman", nz(rs.getString("LGmanyman")));
+                    m.put("fax",       nz(rs.getString("fax")));
+                    m.put("serviceId", nz(rs.getString("serviceid")));
+                    m.put("jiroNo",    nz(rs.getString("jirono")));
+                    m.put("company",   nz(rs.getString("company")));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("userinfo 조회 실패 - openId: {}, 오류: {}", openId, e.getMessage());
+        }
+        return m;
+    }
+
+    private static String nz(String s) { return s == null ? "" : s.trim(); }
+
     /** ?1?2027-03-05! → "2027-03-05" 파싱 */
     private String parseExpiry(String version) {
         if (version == null || version.isBlank()) return null;

@@ -180,6 +180,18 @@ public class AuthController {
     }
 
     /*─────────────────────────────────────────────────────
+     * [3-3] 프로그램이 쓰는 manyman 필드 묶음 조회 (VB6 로그인 후 전역변수 세팅)
+     * GET /api/auth/userinfo?id={id}
+     * 응답: {"kwanhan","lgId","lgPass","lgManyman","fax","serviceId","jiroNo","company"}
+     ─────────────────────────────────────────────────────*/
+    @GetMapping("/userinfo")
+    public ResponseEntity<Map<String, String>> userinfo(@RequestParam String id) {
+        if (manymanSyncService == null || id == null || id.isBlank())
+            return ResponseEntity.ok(Map.of());
+        return ResponseEntity.ok(manymanSyncService.getUserInfo(id.trim()));
+    }
+
+    /*─────────────────────────────────────────────────────
      * [4] 아이디 중복 확인 API
      * POST /api/auth/idcheck
      * 요청 Body: { "openId": "hong123" }
