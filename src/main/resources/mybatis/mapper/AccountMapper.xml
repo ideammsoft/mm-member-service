@@ -103,6 +103,12 @@
         WHERE account_id = #{accountId}
     </update>
 
+    <!-- 이메일 미설정 시 업데이트 -->
+    <update id="updateEmailIfEmpty">
+        UPDATE account SET email = #{email}
+        WHERE account_id = #{accountId} AND (email IS NULL OR email = '')
+    </update>
+
     <!-- 회원 탈퇴 -->
     <delete id="deleteByAccountId" parameterType="Long">
         DELETE FROM account WHERE account_id = #{accountId}

@@ -122,6 +122,9 @@ public interface AccountMapper {
     /** 회원 정보 수정 (phone, email, name, company) */
     int updateProfile(MemberProfileUpdateRequest request);
 
+    /** 이메일 미설정 회원에게만 이메일 저장 */
+    int updateEmailIfEmpty(@Param("accountId") Long accountId, @Param("email") String email);
+
     /** 회원 탈퇴 */
     int deleteByAccountId(Long accountId);
 
