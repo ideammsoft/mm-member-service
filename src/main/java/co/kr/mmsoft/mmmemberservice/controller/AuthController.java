@@ -167,6 +167,19 @@ public class AuthController {
     }
 
     /*─────────────────────────────────────────────────────
+     * [3-2] manyman.codeman(회비/연회비 금액) 조회 (VB6 레거시)
+     * GET /api/auth/fee?id={id}
+     * 응답: 회비 금액 문자열(예: "121000") 또는 ""
+     ─────────────────────────────────────────────────────*/
+    @GetMapping("/fee")
+    public ResponseEntity<String> fee(@RequestParam String id) {
+        if (manymanSyncService == null || id == null || id.isBlank())
+            return ResponseEntity.ok("");
+        String v = manymanSyncService.getCodeman(id.trim());
+        return ResponseEntity.ok(v != null ? v : "");
+    }
+
+    /*─────────────────────────────────────────────────────
      * [4] 아이디 중복 확인 API
      * POST /api/auth/idcheck
      * 요청 Body: { "openId": "hong123" }

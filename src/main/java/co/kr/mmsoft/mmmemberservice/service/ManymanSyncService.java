@@ -251,6 +251,22 @@ public class ManymanSyncService {
         return null;
     }
 
+    /** manyman.codeman(연회비 금액) 원본 반환. 없으면 null. */
+    public String getCodeman(String openId) {
+        if (openId == null || openId.isBlank()) return null;
+        String sql = "SELECT TOP 1 codeman FROM manyman WHERE id = ? AND isDelete = 0";
+        try (Connection conn = mssqlDataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, openId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getString("codeman");
+            }
+        } catch (Exception e) {
+            log.warn("회비(codeman) 조회 실패 - openId: {}, 오류: {}", openId, e.getMessage());
+        }
+        return null;
+    }
+
     /** ?1?2027-03-05! → "2027-03-05" 파싱 */
     private String parseExpiry(String version) {
         if (version == null || version.isBlank()) return null;
