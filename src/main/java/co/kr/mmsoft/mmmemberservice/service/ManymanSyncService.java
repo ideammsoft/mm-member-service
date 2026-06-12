@@ -235,6 +235,22 @@ public class ManymanSyncService {
         return null;
     }
 
+    /** manyman.version 원본 값 반환 (신/구 만료일 적용 구분자, 예: "API"). 없으면 null. */
+    public String getVersion(String openId) {
+        if (openId == null || openId.isBlank()) return null;
+        String sql = "SELECT TOP 1 version FROM manyman WHERE id = ? AND isDelete = 0";
+        try (Connection conn = mssqlDataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, openId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getString("version");
+            }
+        } catch (Exception e) {
+            log.warn("version 조회 실패 - openId: {}, 오류: {}", openId, e.getMessage());
+        }
+        return null;
+    }
+
     /** ?1?2027-03-05! → "2027-03-05" 파싱 */
     private String parseExpiry(String version) {
         if (version == null || version.isBlank()) return null;

@@ -154,6 +154,19 @@ public class AuthController {
     }
 
     /*─────────────────────────────────────────────────────
+     * [3-1] manyman.version 원본 조회 (VB6 레거시: 신/구 만료일 방식 구분자)
+     * GET /api/auth/version?id={id}
+     * 응답: version 원본 문자열(예: "API", "?1?2027-03-05!") 또는 ""
+     ─────────────────────────────────────────────────────*/
+    @GetMapping("/version")
+    public ResponseEntity<String> version(@RequestParam String id) {
+        if (manymanSyncService == null || id == null || id.isBlank())
+            return ResponseEntity.ok("");
+        String v = manymanSyncService.getVersion(id.trim());
+        return ResponseEntity.ok(v != null ? v : "");
+    }
+
+    /*─────────────────────────────────────────────────────
      * [4] 아이디 중복 확인 API
      * POST /api/auth/idcheck
      * 요청 Body: { "openId": "hong123" }
