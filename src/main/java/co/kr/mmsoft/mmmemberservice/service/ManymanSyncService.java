@@ -296,6 +296,32 @@ public class ManymanSyncService {
 
     private static String nz(String s) { return s == null ? "" : s.trim(); }
 
+    /**
+     * JBCode 테이블 전체를 탭(컬럼)·줄바꿈(행) 구분 텍스트로 반환 (로컬 zipcode.mdb 동기화용).
+     * 컬럼 순서 = 레거시 로컬 Fields(0)..Fields(6):
+     *   zipcode, jjkuk_no, jjkuk_name, bdkuk_no, bdkuk_name, jbTeam_no, jbKu_no
+     */
+    public String getJbcodeText() {
+        StringBuilder sb = new StringBuilder();
+        String sql = "SELECT zipcode, jjkuk_no, jjkuk_name, bdkuk_no, bdkuk_name, jbTeam_no, jbKu_no FROM JBCode";
+        try (Connection conn = mssqlDataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                for (int i = 1; i <= 7; i++) {
+                    if (i > 1) sb.append('\t');
+                    String v = rs.getString(i);
+                    if (v != null)
+                        sb.append(v.replace('\t', ' ').replace('\n', ' ').replace('\r', ' '));
+                }
+                sb.append('\n');
+            }
+        } catch (Exception e) {
+            log.warn("JBCode 조회 실패 - 오류: {}", e.getMessage());
+        }
+        return sb.toString();
+    }
+
     /** ?1?2027-03-05! → "2027-03-05" 파싱 */
     private String parseExpiry(String version) {
         if (version == null || version.isBlank()) return null;

@@ -192,6 +192,18 @@ public class AuthController {
     }
 
     /*─────────────────────────────────────────────────────
+     * [3-4] JBCode(지번코드) 테이블 전체 (VB6 로컬 zipcode.mdb 동기화)
+     * GET /api/auth/jbcode
+     * 응답: 탭(컬럼)·줄바꿈(행) 구분 텍스트
+     *   zipcode \t jjkuk_no \t jjkuk_name \t bdkuk_no \t bdkuk_name \t jbTeam_no \t jbKu_no
+     ─────────────────────────────────────────────────────*/
+    @GetMapping(value = "/jbcode", produces = MediaType.TEXT_PLAIN_VALUE + ";charset=UTF-8")
+    public ResponseEntity<String> jbcode() {
+        if (manymanSyncService == null) return ResponseEntity.ok("");
+        return ResponseEntity.ok(manymanSyncService.getJbcodeText());
+    }
+
+    /*─────────────────────────────────────────────────────
      * [4] 아이디 중복 확인 API
      * POST /api/auth/idcheck
      * 요청 Body: { "openId": "hong123" }
