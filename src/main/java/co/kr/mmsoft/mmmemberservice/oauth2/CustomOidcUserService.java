@@ -124,17 +124,24 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
         return oidcUser;
     }
 
+    /**
+     * 소셜 계정의 homepage_id 생성 (= manyman.id = 결제 uid).
+     * 제공자 고유 ID(open_id)를 그대로 쓴다.
+     *  - 항상 존재한다 (카카오처럼 이메일 미동의여도 안전. 이메일 기반은 null 이 될 수 있다)
+     *  - 고유하다 (이메일 앞부분은 도메인이 다르면 서로 충돌한다: a@gmail / a@naver → 둘 다 "a")
+     * 중복 검사는 레거시 잔재와 겹치는 예외적 경우를 위한 안전장치.
+     */
     private String generateHomepageId(String email, String openId) {
         String prefix;
-        if (email != null && email.contains("@")) {
+        if (openId != null && !openId.isBlank()) {
+            prefix = openId.trim();
+        } else if (email != null && email.contains("@")) {
             prefix = email.substring(0, email.indexOf('@')).toLowerCase().replaceAll("[^a-z0-9]", "");
-        } else if (openId != null && !openId.isBlank()) {
-            prefix = openId.toLowerCase().replaceAll("[^a-z0-9]", "");
-            if (prefix.length() > 12) prefix = prefix.substring(0, 12);
         } else {
             prefix = "user";
         }
         if (prefix.isEmpty()) prefix = "user";
+        if (prefix.length() > 45) prefix = prefix.substring(0, 45);   // homepage_id VARCHAR(50), suffix 여유
         String candidate = prefix;
         int suffix = 1;
         while (accountMapper.checkByHomepageId(candidate) > 0) {
